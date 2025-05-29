@@ -17,11 +17,11 @@ A powerful Vite plugin for building multi-page applications with smart file rout
 ## 📦 Installation
 
 ```bash
-npm install vite-plugin-multi-page
+npm install @fchc8/vite-plugin-multi-page
 # or
-yarn add vite-plugin-multi-page
+yarn add @fchc8/vite-plugin-multi-page
 # or
-pnpm add vite-plugin-multi-page
+pnpm add @fchc8/vite-plugin-multi-page
 ```
 
 ## 🚀 Quick Start
@@ -31,7 +31,7 @@ pnpm add vite-plugin-multi-page
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite';
-import viteMultiPage from 'vite-plugin-multi-page';
+import viteMultiPage from '@fchc8/vite-plugin-multi-page';
 
 export default defineConfig({
   plugins: [
@@ -39,9 +39,9 @@ export default defineConfig({
       entry: 'src/pages/**/*.{ts,js}',
       template: 'index.html',
       exclude: ['src/main.ts'],
-      debug: true
-    })
-  ]
+      debug: true,
+    }),
+  ],
 });
 ```
 
@@ -68,69 +68,69 @@ project/
 
 ```typescript
 import { defineConfig } from 'vite';
-import viteMultiPage from 'vite-plugin-multi-page';
+import viteMultiPage from '@fchc8/vite-plugin-multi-page';
 
 export default defineConfig({
   plugins: [
     viteMultiPage({
       entry: 'src/pages/**/*.{ts,js}',
-      
+
       // Define build strategies
       buildStrategies: {
         // Modern browser strategy
         default: {
           viteConfig: {
             define: {
-              'process.env.BUILD_TYPE': '"modern"'
-            }
+              'process.env.BUILD_TYPE': '"modern"',
+            },
           },
           output: {
             format: 'es',
-            entryFileNames: 'assets/[name]-[hash].js'
+            entryFileNames: 'assets/[name]-[hash].js',
           },
           build: {
             target: 'es2015',
             minify: 'esbuild',
-            sourcemap: true
-          }
+            sourcemap: true,
+          },
         },
-        
+
         // Legacy compatibility strategy
         legacy: {
           viteConfig: {
             define: {
-              'process.env.BUILD_TYPE': '"legacy"'
-            }
+              'process.env.BUILD_TYPE': '"legacy"',
+            },
           },
           output: {
             format: 'iife',
-            entryFileNames: 'legacy/[name].js'
+            entryFileNames: 'legacy/[name].js',
           },
           build: {
             target: 'es5',
             minify: 'terser',
-            sourcemap: false
-          }
+            sourcemap: false,
+          },
         },
-        
+
         // Mobile optimization strategy
         mobile: {
           viteConfig: {
             css: {
-              devSourcemap: true
+              devSourcemap: true,
             },
             optimizeDeps: {
-              include: ['mobile-utils']
-            }
+              include: ['mobile-utils'],
+            },
           },
           build: {
             target: 'es2018',
-            chunkSizeWarningLimit: 300
-          }
-        }
-      }
-    })
-  ]
+            chunkSizeWarningLimit: 300,
+          },
+        },
+      },
+    }),
+  ],
 });
 ```
 
@@ -139,39 +139,39 @@ export default defineConfig({
 ```typescript
 viteMultiPage({
   entry: 'src/pages/**/*.{ts,js}',
-  
+
   // Use function for dynamic configuration
-  pageConfigs: (context) => {
+  pageConfigs: context => {
     const { pageName, filePath, relativePath } = context;
-    
+
     // Admin pages
     if (pageName.startsWith('admin')) {
       return {
         strategy: 'default',
         template: 'admin.html',
         define: {
-          'process.env.API_BASE': '"https://admin-api.example.com"'
-        }
+          'process.env.API_BASE': '"https://admin-api.example.com"',
+        },
       };
     }
-    
+
     // Mobile pages
     if (relativePath.includes('/mobile/')) {
       return {
         strategy: 'mobile',
         template: 'mobile.html',
         define: {
-          'process.env.API_BASE': '"https://mobile-api.example.com"'
-        }
+          'process.env.API_BASE': '"https://mobile-api.example.com"',
+        },
       };
     }
-    
+
     // Default configuration
     return {
-      strategy: 'default'
+      strategy: 'default',
     };
-  }
-})
+  },
+});
 ```
 
 ### Object Configuration with Pattern Matching
@@ -179,43 +179,43 @@ viteMultiPage({
 ```typescript
 viteMultiPage({
   entry: 'src/pages/**/*.{ts,js}',
-  
+
   pageConfigs: {
     // Exact match
-    'home': {
+    home: {
       strategy: 'default',
-      template: 'home.html'
+      template: 'home.html',
     },
-    
+
     // Wildcard match
     'admin*': {
       strategy: 'default',
-      template: 'admin.html'
+      template: 'admin.html',
     },
-    
+
     // Pattern match
     'mobile-app': {
       strategy: 'mobile',
       match: ['**/mobile/**', '*mobile*'],
-      template: 'mobile.html'
-    }
-  }
-})
+      template: 'mobile.html',
+    },
+  },
+});
 ```
 
 ## 📋 Configuration Options
 
 ### MultiPageOptions
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `entry` | `string` | `"src/**/*.{ts,js}"` | Entry file matching pattern |
-| `template` | `string` | `"index.html"` | Default HTML template |
-| `exclude` | `string[]` | `["src/main.ts", "src/vite-env.d.ts"]` | Files to exclude |
-| `placeholder` | `string` | `"{{ENTRY_FILE}}"` | Placeholder in template |
-| `debug` | `boolean` | `false` | Enable debug logs |
-| `buildStrategies` | `Record<string, BuildStrategy>` | `{}` | Build strategy definitions |
-| `pageConfigs` | `Record<string, PageConfig> \| PageConfigFunction` | `{}` | Page configurations |
+| Option            | Type                                               | Default                                | Description                 |
+| ----------------- | -------------------------------------------------- | -------------------------------------- | --------------------------- |
+| `entry`           | `string`                                           | `"src/**/*.{ts,js}"`                   | Entry file matching pattern |
+| `template`        | `string`                                           | `"index.html"`                         | Default HTML template       |
+| `exclude`         | `string[]`                                         | `["src/main.ts", "src/vite-env.d.ts"]` | Files to exclude            |
+| `placeholder`     | `string`                                           | `"{{ENTRY_FILE}}"`                     | Placeholder in template     |
+| `debug`           | `boolean`                                          | `false`                                | Enable debug logs           |
+| `buildStrategies` | `Record<string, BuildStrategy>`                    | `{}`                                   | Build strategy definitions  |
+| `pageConfigs`     | `Record<string, PageConfig> \| PageConfigFunction` | `{}`                                   | Page configurations         |
 
 ### BuildStrategy
 
@@ -225,7 +225,7 @@ interface BuildStrategy {
   viteConfig?: Omit<UserConfig, 'plugins' | 'build'> & {
     build?: BuildOptions;
   };
-  
+
   // Output configuration
   output?: {
     format?: 'es' | 'cjs' | 'umd' | 'iife';
@@ -236,7 +236,7 @@ interface BuildStrategy {
     globals?: Record<string, string>;
     external?: string | string[] | ((id: string) => boolean);
   };
-  
+
   // Build configuration
   build?: {
     target?: string | string[];
@@ -248,19 +248,19 @@ interface BuildStrategy {
     rollupOptions?: any;
     // ... more Vite build options
   };
-  
+
   // Environment variables
   define?: Record<string, any>;
-  
+
   // Alias configuration
   alias?: Record<string, string>;
-  
+
   // Server configuration
   server?: ServerOptions;
-  
+
   // CSS configuration
   css?: CSSOptions;
-  
+
   // Dependency optimization
   optimizeDeps?: DepOptimizationOptions;
 }
@@ -270,13 +270,13 @@ interface BuildStrategy {
 
 ```typescript
 interface PageConfig {
-  strategy?: string;           // Build strategy to use
-  template?: string;           // Page template
-  exclude?: string[];          // Exclude rules
+  strategy?: string; // Build strategy to use
+  template?: string; // Page template
+  exclude?: string[]; // Exclude rules
   define?: Record<string, any>; // Environment variables
   alias?: Record<string, string>; // Aliases
   build?: Partial<BuildStrategy['build']>; // Build configuration
-  match?: string | string[];   // Match patterns
+  match?: string | string[]; // Match patterns
 }
 ```
 
@@ -295,7 +295,7 @@ buildStrategies: {
       sourcemap: true
     }
   },
-  
+
   public: {
     viteConfig: {
       define: { 'process.env.APP_TYPE': '"public"' }
@@ -386,7 +386,7 @@ After building, visit these pages:
 
 ```bash
 # Clone the project
-git clone <repository-url>
+git clone https://github.com/fchc7/vite-plugin-multi-page.git
 cd vite-plugin-multi-page
 
 # Install dependencies
@@ -421,4 +421,4 @@ MIT License
 - [Vite Official Documentation](https://vitejs.dev/)
 - [TypeScript](https://www.typescriptlang.org/)
 - [ESLint](https://eslint.org/)
-- [Prettier](https://prettier.io/) 
+- [Prettier](https://prettier.io/)
