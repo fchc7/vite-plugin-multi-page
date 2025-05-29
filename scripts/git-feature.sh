@@ -63,9 +63,9 @@ case "$1" in
         
         # 运行测试和检查
         echo -e "${YELLOW}🧪 运行代码检查...${NC}"
-        npm run lint
-        npm run format:check
-        npm run type-check
+        pnpm run lint
+        pnpm run format:check
+        pnpm run type-check
         
         # 切换到 develop 并合并
         git checkout develop

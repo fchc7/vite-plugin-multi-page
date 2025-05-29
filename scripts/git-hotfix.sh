@@ -78,10 +78,10 @@ case "$1" in
         
         # 运行测试和检查
         echo -e "${YELLOW}🧪 运行代码检查...${NC}"
-        npm run lint
-        npm run format:check
-        npm run type-check
-        npm run build
+        pnpm run lint
+        pnpm run format:check
+        pnpm run type-check
+        pnpm run build
         
         # 合并到 main 分支
         echo -e "${YELLOW}🔀 合并到 main 分支...${NC}"

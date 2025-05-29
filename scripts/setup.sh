@@ -29,33 +29,33 @@ echo -e "${GREEN}✅ Node.js 版本检查通过: $(node --version)${NC}"
 
 # 安装依赖
 echo -e "${YELLOW}📦 安装项目依赖...${NC}"
-npm install
+pnpm install
 
 # 构建插件
 echo -e "${YELLOW}🔨 构建插件...${NC}"
-npm run build
+pnpm run build
 
 # 设置示例项目
 echo -e "${YELLOW}🎯 设置示例项目...${NC}"
 cd example
-npm install
+pnpm install
 cd ..
 
 echo -e "${GREEN}✅ 项目初始化完成！${NC}"
 
 echo -e "${BLUE}🎉 下一步操作:${NC}"
-echo -e "${YELLOW}  开发模式: npm run example:dev${NC}"
-echo -e "${YELLOW}  构建测试: npm run example:build${NC}"
-echo -e "${YELLOW}  代码检查: npm run lint${NC}"
-echo -e "${YELLOW}  格式化代码: npm run format${NC}"
+echo -e "${YELLOW}  开发模式: pnpm run example:dev${NC}"
+echo -e "${YELLOW}  构建测试: pnpm run example:build${NC}"
+echo -e "${YELLOW}  代码检查: pnpm run lint${NC}"
+echo -e "${YELLOW}  格式化代码: pnpm run format${NC}"
 
 echo -e "${BLUE}📚 Git Flow 命令:${NC}"
-echo -e "${YELLOW}  新功能: npm run git:feature start <name>${NC}"
-echo -e "${YELLOW}  发布: npm run git:release start <version>${NC}"
-echo -e "${YELLOW}  紧急修复: npm run git:hotfix start <version>${NC}"
+echo -e "${YELLOW}  新功能: pnpm run git:feature start <name>${NC}"
+echo -e "${YELLOW}  发布: pnpm run git:release start <version>${NC}"
+echo -e "${YELLOW}  紧急修复: pnpm run git:hotfix start <version>${NC}"
 
 echo -e "${BLUE}🚢 发布命令:${NC}"
-echo -e "${YELLOW}  发布前检查: npm run pre-release${NC}"
-echo -e "${YELLOW}  补丁版本: npm run release:patch${NC}"
-echo -e "${YELLOW}  次要版本: npm run release:minor${NC}"
-echo -e "${YELLOW}  主要版本: npm run release:major${NC}" 
+echo -e "${YELLOW}  发布前检查: pnpm run pre-release${NC}"
+echo -e "${YELLOW}  补丁版本: pnpm run release:patch${NC}"
+echo -e "${YELLOW}  次要版本: pnpm run release:minor${NC}"
+echo -e "${YELLOW}  主要版本: pnpm run release:major${NC}" 
