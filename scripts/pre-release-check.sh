@@ -48,7 +48,7 @@ echo -e "${GREEN}✅ 远程同步检查通过${NC}"
 echo -e "${YELLOW}📦 安装依赖...${NC}"
 if [ -f "pnpm-lock.yaml" ]; then
     echo -e "${YELLOW}  使用 pnpm...${NC}"
-    pnpm install --frozen-lockfile
+    pnpm install
 else
     npm ci
 fi
