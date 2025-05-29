@@ -1,5 +1,5 @@
-import * as path from "node:path";
-import type { EntryFile, CandidateFile } from "./types";
+import * as path from 'node:path';
+import type { EntryFile, CandidateFile } from './types';
 
 export function filterEntryFiles(
   files: string[],
@@ -10,8 +10,8 @@ export function filterEntryFiles(
   const result: EntryFile[] = [];
   const nameToFile = new Map<string, string>();
 
-  const basePattern = entry.replace(/\/\*\*.*$/, "");
-  log("基础目录模式:", basePattern);
+  const basePattern = entry.replace(/\/\*\*.*$/, '');
+  log('基础目录模式:', basePattern);
 
   const candidateFiles: CandidateFile[] = [];
 
@@ -37,7 +37,7 @@ export function filterEntryFiles(
       const fileName = path.basename(file, path.extname(file));
       const dirName = pathParts[0];
 
-      if (fileName === "main") {
+      if (fileName === 'main') {
         candidateFiles.push({ name: dirName, file, priority: 2 });
         log(`📁 目录main文件: ${file} -> ${dirName}.html (优先级: 2)`);
       } else {
@@ -55,19 +55,12 @@ export function filterEntryFiles(
       nameToFile.set(candidate.name, candidate.file);
       log(`✅ 添加页面: ${candidate.name} -> ${candidate.file}`);
     } else {
-      const existingCandidate = candidateFiles.find((c) => c.file === existing);
-      if (
-        existingCandidate &&
-        candidate.priority > existingCandidate.priority
-      ) {
+      const existingCandidate = candidateFiles.find(c => c.file === existing);
+      if (existingCandidate && candidate.priority > existingCandidate.priority) {
         nameToFile.set(candidate.name, candidate.file);
-        log(
-          `🔄 替换页面: ${candidate.name} -> ${candidate.file} (替换 ${existing})`
-        );
+        log(`🔄 替换页面: ${candidate.name} -> ${candidate.file} (替换 ${existing})`);
       } else {
-        log(
-          `⚠️ 冲突跳过: ${candidate.name} -> ${candidate.file} (保留 ${existing})`
-        );
+        log(`⚠️ 冲突跳过: ${candidate.name} -> ${candidate.file} (保留 ${existing})`);
       }
     }
   }

@@ -29,12 +29,14 @@ export interface BuildStrategy {
     target?: string | string[];
     minify?: boolean | 'terser' | 'esbuild';
     sourcemap?: boolean | 'inline' | 'hidden';
-    lib?: boolean | {
-      entry: string | string[] | { [entryAlias: string]: string };
-      name?: string;
-      formats?: ('es' | 'cjs' | 'umd' | 'iife')[];
-      fileName?: string | ((format: string, entryName: string) => string);
-    };
+    lib?:
+      | boolean
+      | {
+          entry: string | string[] | { [entryAlias: string]: string };
+          name?: string;
+          formats?: ('es' | 'cjs' | 'umd' | 'iife')[];
+          fileName?: string | ((format: string, entryName: string) => string);
+        };
     cssCodeSplit?: boolean;
     cssTarget?: string | string[];
     rollupOptions?: any;
@@ -81,7 +83,7 @@ export interface PageConfigBase {
   match?: string | string[];
 }
 
-export interface PageConfig extends PageConfigBase { }
+export interface PageConfig extends PageConfigBase {}
 
 export interface PageConfigContext {
   pageName: string;

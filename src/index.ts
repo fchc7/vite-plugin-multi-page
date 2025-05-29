@@ -1,19 +1,19 @@
-import type { Plugin } from "vite";
-import * as path from "node:path";
-import * as fs from "node:fs";
-import type { MultiPageOptions } from "./types";
-import { createLogger } from "./utils";
-import { configureDevServer } from "./dev-server";
-import { createBuildConfig, createDevConfig } from "./build-config";
+import type { Plugin } from 'vite';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import type { MultiPageOptions } from './types';
+import { createLogger } from './utils';
+import { configureDevServer } from './dev-server';
+import { createBuildConfig, createDevConfig } from './build-config';
 
 export type { MultiPageOptions };
 
 export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
   const {
-    entry = "src/**/*.{ts,js}",
-    template = "index.html",
-    exclude = ["src/main.ts", "src/vite-env.d.ts"],
-    placeholder = "{{ENTRY_FILE}}",
+    entry = 'src/**/*.{ts,js}',
+    template = 'index.html',
+    exclude = ['src/main.ts', 'src/vite-env.d.ts'],
+    placeholder = '{{ENTRY_FILE}}',
     debug = false,
     buildStrategies,
     pageConfigs,
@@ -21,13 +21,13 @@ export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
 
   const log = createLogger(debug);
   let tempFiles: string[] = [];
-  let pageMapping: Map<string, string> = new Map();
+  const pageMapping: Map<string, string> = new Map();
 
   return {
-    name: "vite-plugin-multi-page",
+    name: 'vite-plugin-multi-page',
 
     config(config: any, { command }: { command: string }) {
-      if (command === "build") {
+      if (command === 'build') {
         createBuildConfig(
           config,
           { entry, exclude, template, placeholder, buildStrategies, pageConfigs },
@@ -41,11 +41,7 @@ export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
     },
 
     configureServer(server) {
-      configureDevServer(
-        server,
-        { entry, exclude, template, placeholder },
-        log
-      );
+      configureDevServer(server, { entry, exclude, template, placeholder }, log);
     },
 
     generateBundle() {
@@ -54,8 +50,8 @@ export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
 
     writeBundle(options: any) {
       Array.from(pageMapping.entries()).forEach(([tempName, targetName]) => {
-        const tempPath = path.resolve(options.dir || "dist", tempName);
-        const targetPath = path.resolve(options.dir || "dist", targetName);
+        const tempPath = path.resolve(options.dir || 'dist', tempName);
+        const targetPath = path.resolve(options.dir || 'dist', targetName);
 
         if (fs.existsSync(tempPath)) {
           fs.renameSync(tempPath, targetPath);
@@ -65,7 +61,7 @@ export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
     },
 
     closeBundle() {
-      tempFiles.forEach((filePath) => {
+      tempFiles.forEach(filePath => {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
           const fileName = path.basename(filePath);

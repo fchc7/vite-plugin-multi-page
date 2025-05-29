@@ -1,9 +1,9 @@
-import * as path from "node:path";
-import * as fs from "node:fs";
-import { glob } from "glob";
-import { filterEntryFiles } from "./file-filter";
-import { escapeRegExp } from "./utils";
-import type { BuildStrategy, PageConfig, PageConfigFunction, PageConfigContext } from "./types";
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { glob } from 'glob';
+import { filterEntryFiles } from './file-filter';
+import { escapeRegExp } from './utils';
+import type { BuildStrategy, PageConfig, PageConfigFunction, PageConfigContext } from './types';
 
 // 简单的 glob 模式匹配函数
 function simpleMatch(pattern: string, str: string): boolean {
@@ -31,27 +31,19 @@ export function createBuildConfig(
   pageMapping: Map<string, string>
 ) {
   const allFiles = glob.sync(options.entry, { cwd: process.cwd() });
-  const entryFiles = filterEntryFiles(
-    allFiles,
-    options.entry,
-    options.exclude,
-    log
-  );
+  const entryFiles = filterEntryFiles(allFiles, options.entry, options.exclude, log);
 
   if (entryFiles.length === 0) {
-    console.warn(
-      "[vite-plugin-multi-page] No entry files found matching pattern:",
-      options.entry
-    );
+    console.warn('[vite-plugin-multi-page] No entry files found matching pattern:', options.entry);
     return;
   }
 
-  log("扫描到的所有文件:", allFiles);
-  log("过滤后的入口文件:", entryFiles);
+  log('扫描到的所有文件:', allFiles);
+  log('过滤后的入口文件:', entryFiles);
 
   // 清理旧的临时文件
-  const existingTempFiles = glob.sync("temp-*.html", { cwd: process.cwd() });
-  existingTempFiles.forEach((file) => {
+  const existingTempFiles = glob.sync('temp-*.html', { cwd: process.cwd() });
+  existingTempFiles.forEach(file => {
     const fullPath = path.resolve(process.cwd(), file);
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);
@@ -67,17 +59,21 @@ export function createBuildConfig(
   const strategyGroups: Record<string, typeof entryFiles> = {};
   const defaultStrategy = 'default';
 
-  entryFiles.forEach((entryFile) => {
+  entryFiles.forEach(entryFile => {
     const { name, file } = entryFile;
 
     // 获取页面配置
-    const pageConfig = getPageConfig(options.pageConfigs, {
-      pageName: name,
-      filePath: file,
-      relativePath: path.relative(process.cwd(), file),
-      strategy: undefined,
-      isMatched: false
-    }, log);
+    const pageConfig = getPageConfig(
+      options.pageConfigs,
+      {
+        pageName: name,
+        filePath: file,
+        relativePath: path.relative(process.cwd(), file),
+        strategy: undefined,
+        isMatched: false,
+      },
+      log
+    );
 
     const strategy = pageConfig?.strategy || defaultStrategy;
 
@@ -94,11 +90,8 @@ export function createBuildConfig(
     const tempHtmlPath = path.resolve(process.cwd(), `temp-${name}.html`);
 
     if (fs.existsSync(templatePath)) {
-      let html = fs.readFileSync(templatePath, "utf-8");
-      html = html.replace(
-        new RegExp(escapeRegExp(options.placeholder), "g"),
-        `/${file}`
-      );
+      let html = fs.readFileSync(templatePath, 'utf-8');
+      html = html.replace(new RegExp(escapeRegExp(options.placeholder), 'g'), `/${file}`);
 
       fs.writeFileSync(tempHtmlPath, html);
       tempFiles.push(tempHtmlPath);
@@ -110,8 +103,8 @@ export function createBuildConfig(
     }
   });
 
-  log("Build input configuration:", input);
-  log("Strategy groups:", Object.keys(strategyGroups));
+  log('Build input configuration:', input);
+  log('Strategy groups:', Object.keys(strategyGroups));
 
   // 应用构建策略
   config.build = config.build || {};
@@ -134,13 +127,18 @@ export function createBuildConfig(
   }
 
   // 处理多策略情况（需要多次构建）
-  if (strategyKeys.length > 1 || (strategyKeys.length === 1 && strategyKeys[0] !== defaultStrategy && options.buildStrategies?.[strategyKeys[0]])) {
-    log("检测到多构建策略，将创建策略映射");
+  if (
+    strategyKeys.length > 1 ||
+    (strategyKeys.length === 1 &&
+      strategyKeys[0] !== defaultStrategy &&
+      options.buildStrategies?.[strategyKeys[0]])
+  ) {
+    log('检测到多构建策略，将创建策略映射');
     // 在插件实例上存储策略信息，供后续处理
     (config as any).__multiPageStrategies = {
       groups: strategyGroups,
       strategies: options.buildStrategies,
-      pageConfigs: options.pageConfigs
+      pageConfigs: options.pageConfigs,
     };
   }
 }
@@ -172,10 +170,11 @@ function getPageConfig(
     // 模式匹配
     if (config.match) {
       const patterns = Array.isArray(config.match) ? config.match : [config.match];
-      const isMatched = patterns.some(pattern =>
-        simpleMatch(pattern, context.pageName) ||
-        simpleMatch(pattern, context.relativePath) ||
-        simpleMatch(pattern, context.filePath)
+      const isMatched = patterns.some(
+        pattern =>
+          simpleMatch(pattern, context.pageName) ||
+          simpleMatch(pattern, context.relativePath) ||
+          simpleMatch(pattern, context.filePath)
       );
 
       if (isMatched) {
@@ -195,7 +194,7 @@ function getPageConfig(
 }
 
 function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args: any[]) => void) {
-  log("应用构建策略:", strategy);
+  log('应用构建策略:', strategy);
 
   // 应用完整的 Vite 配置
   if (strategy.viteConfig) {
@@ -203,13 +202,14 @@ function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args:
 
     // 合并非构建配置
     Object.keys(otherViteConfig).forEach(key => {
-      if (key !== 'plugins') { // 跳过 plugins，避免冲突
+      if (key !== 'plugins') {
+        // 跳过 plugins，避免冲突
         const configKey = key as keyof typeof config;
         const viteConfigValue = otherViteConfig[key as keyof typeof otherViteConfig];
         if (viteConfigValue && typeof viteConfigValue === 'object') {
           config[configKey] = {
             ...(config[configKey] || {}),
-            ...viteConfigValue
+            ...viteConfigValue,
           };
         } else {
           config[configKey] = viteConfigValue;
@@ -221,7 +221,7 @@ function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args:
     if (viteBuild) {
       config.build = {
         ...config.build,
-        ...viteBuild
+        ...viteBuild,
       };
     }
   }
@@ -230,7 +230,7 @@ function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args:
   if (strategy.output) {
     config.build.rollupOptions.output = {
       ...config.build.rollupOptions.output,
-      ...strategy.output
+      ...strategy.output,
     };
   }
 
@@ -238,7 +238,7 @@ function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args:
   if (strategy.build) {
     config.build = {
       ...config.build,
-      ...strategy.build
+      ...strategy.build,
     };
   }
 
@@ -246,7 +246,7 @@ function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args:
   if (strategy.define) {
     config.define = {
       ...config.define,
-      ...strategy.define
+      ...strategy.define,
     };
   }
 
@@ -255,7 +255,7 @@ function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args:
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...config.resolve.alias,
-      ...strategy.alias
+      ...strategy.alias,
     };
   }
 
@@ -263,7 +263,7 @@ function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args:
   if (strategy.server) {
     config.server = {
       ...config.server,
-      ...strategy.server
+      ...strategy.server,
     };
   }
 
@@ -271,7 +271,7 @@ function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args:
   if (strategy.css) {
     config.css = {
       ...config.css,
-      ...strategy.css
+      ...strategy.css,
     };
   }
 
@@ -279,7 +279,7 @@ function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args:
   if (strategy.optimizeDeps) {
     config.optimizeDeps = {
       ...config.optimizeDeps,
-      ...strategy.optimizeDeps
+      ...strategy.optimizeDeps,
     };
   }
 }
@@ -292,16 +292,11 @@ export function createDevConfig(
   log: (...args: any[]) => void
 ) {
   const allFiles = glob.sync(options.entry, { cwd: process.cwd() });
-  const entryFiles = filterEntryFiles(
-    allFiles,
-    options.entry,
-    options.exclude,
-    log
-  );
+  const entryFiles = filterEntryFiles(allFiles, options.entry, options.exclude, log);
 
   const input: Record<string, string> = {};
   entryFiles.forEach(({ name, file }) => {
     input[name] = path.resolve(process.cwd(), file);
   });
-  log("Dev input configuration:", input);
+  log('Dev input configuration:', input);
 }

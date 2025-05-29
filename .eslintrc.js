@@ -4,18 +4,18 @@ module.exports = {
   plugins: ['@typescript-eslint', 'prettier'],
   extends: [
     'eslint:recommended',
-    '@typescript-eslint/recommended',
+    'plugin:@typescript-eslint/recommended',
     'prettier',
-    'plugin:prettier/recommended'
+    'plugin:prettier/recommended',
   ],
   parserOptions: {
     ecmaVersion: 2020,
     sourceType: 'module',
-    project: './tsconfig.json'
+    project: './tsconfig.json',
   },
   env: {
     node: true,
-    es6: true
+    es6: true,
   },
   rules: {
     'prettier/prettier': 'error',
@@ -25,7 +25,8 @@ module.exports = {
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-non-null-assertion': 'warn',
     'prefer-const': 'error',
-    'no-var': 'error'
+    'no-var': 'error',
+    '@typescript-eslint/no-explicit-any': 'off', // 允许显式 any
   },
-  ignorePatterns: ['dist/', 'node_modules/', '*.js']
-}; 
+  ignorePatterns: ['dist/', 'node_modules/', '*.js'],
+};
