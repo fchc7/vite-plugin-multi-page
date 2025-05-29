@@ -17,11 +17,11 @@
 ## 📦 安装
 
 ```bash
-npm install vite-plugin-multi-page
+npm install @fchc8/vite-plugin-multi-page
 # 或
-yarn add vite-plugin-multi-page
+yarn add @fchc8/vite-plugin-multi-page
 # 或
-pnpm add vite-plugin-multi-page
+pnpm add @fchc8/vite-plugin-multi-page
 ```
 
 ## 🚀 快速开始
@@ -31,7 +31,7 @@ pnpm add vite-plugin-multi-page
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite';
-import viteMultiPage from 'vite-plugin-multi-page';
+import viteMultiPage from '@fchc8/vite-plugin-multi-page';
 
 export default defineConfig({
   plugins: [
@@ -68,7 +68,7 @@ project/
 
 ```typescript
 import { defineConfig } from 'vite';
-import viteMultiPage from 'vite-plugin-multi-page';
+import viteMultiPage from '@fchc8/vite-plugin-multi-page';
 
 export default defineConfig({
   plugins: [
@@ -475,18 +475,9 @@ git tag v1.1.0
 git push origin v1.1.0
 ```
 
-## 📚 文档
-
-- 📋 [发布指南](./RELEASE.md) - 完整的发布流程说明
-- 🤝 [贡献指南](./CONTRIBUTING.md) - 如何为项目做贡献
-- 📝 [变更日志](./CHANGELOG.md) - 版本变更记录
-- ✅ [检查清单](./CHECKLIST.md) - 发布前检查清单
-
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
-
-请阅读我们的 [贡献指南](./CONTRIBUTING.md) 了解详细的开发流程和代码规范。
 
 ## 📄 许可证
 
