@@ -46,7 +46,12 @@ echo -e "${GREEN}✅ 远程同步检查通过${NC}"
 
 # 安装依赖
 echo -e "${YELLOW}📦 安装依赖...${NC}"
-npm ci
+if [ -f "pnpm-lock.yaml" ]; then
+    echo -e "${YELLOW}  使用 pnpm...${NC}"
+    pnpm install --frozen-lockfile
+else
+    npm ci
+fi
 
 # 代码检查
 echo -e "${YELLOW}🧪 运行代码检查...${NC}"
@@ -71,8 +76,14 @@ echo -e "${GREEN}✅ 构建测试通过${NC}"
 # 示例项目测试
 echo -e "${YELLOW}🎯 示例项目测试...${NC}"
 cd example
-npm install
-npm run build
+if [ -f "pnpm-lock.yaml" ]; then
+    echo -e "${YELLOW}  示例项目使用 pnpm...${NC}"
+    pnpm install
+    pnpm run build
+else
+    npm install
+    npm run build
+fi
 cd ..
 
 echo -e "${GREEN}✅ 示例项目测试通过${NC}"
