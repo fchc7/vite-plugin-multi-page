@@ -1,6 +1,6 @@
 {
   "name": "@fchc8/vite-plugin-multi-page",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A Vite plugin for building multi-page applications with smart file routing",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -21,15 +21,15 @@
     "file-based",
     "typescript"
   ],
-  "author": "Your Name <your.email@example.com>",
+  "author": "jx.zhu@foxmail.com",
   "license": "MIT",
-  "homepage": "https://github.com/your-username/vite-plugin-multi-page#readme",
+  "homepage": "https://github.com/fchc7/vite-plugin-multi-page#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/vite-plugin-multi-page.git"
+    "url": "git+https://github.com/fchc7/vite-plugin-multi-page.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/vite-plugin-multi-page/issues"
+    "url": "https://github.com/fchc7/vite-plugin-multi-page/issues"
   },
   "scripts": {
     "build": "tsup",
