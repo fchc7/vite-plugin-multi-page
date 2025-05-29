@@ -1,0 +1,614 @@
+/* 移动端基础样式重置 - 这些 px 值会被 PostCSS 转换为 rem */
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #333;
+  background-color: #f5f5f5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* 移动端触摸优化 */
+button,
+input,
+textarea,
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border-radius: 0;
+  outline: none;
+}
+
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea {
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+/* 移动端专用工具类 */
+.mobile-container {
+  max-width: 750px; /* 基于 375px 设计稿的 2x */
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.mobile-flex {
+  display: flex;
+  align-items: center;
+}
+
+.mobile-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobile-text-center {
+  text-align: center;
+}
+
+.mobile-text-left {
+  text-align: left;
+}
+
+.mobile-text-right {
+  text-align: right;
+}
+
+/* 移动端间距工具类 */
+.mobile-p-10 {
+  padding: 10px;
+}
+.mobile-p-15 {
+  padding: 15px;
+}
+.mobile-p-20 {
+  padding: 20px;
+}
+.mobile-p-30 {
+  padding: 30px;
+}
+
+.mobile-m-10 {
+  margin: 10px;
+}
+.mobile-m-15 {
+  margin: 15px;
+}
+.mobile-m-20 {
+  margin: 20px;
+}
+.mobile-m-30 {
+  margin: 30px;
+}
+
+.mobile-mt-10 {
+  margin-top: 10px;
+}
+.mobile-mt-15 {
+  margin-top: 15px;
+}
+.mobile-mt-20 {
+  margin-top: 20px;
+}
+.mobile-mt-30 {
+  margin-top: 30px;
+}
+
+.mobile-mb-10 {
+  margin-bottom: 10px;
+}
+.mobile-mb-15 {
+  margin-bottom: 15px;
+}
+.mobile-mb-20 {
+  margin-bottom: 20px;
+}
+.mobile-mb-30 {
+  margin-bottom: 30px;
+}
+
+/* 移动端字体大小 */
+.mobile-text-xs {
+  font-size: 12px;
+}
+.mobile-text-sm {
+  font-size: 14px;
+}
+.mobile-text-base {
+  font-size: 16px;
+}
+.mobile-text-lg {
+  font-size: 18px;
+}
+.mobile-text-xl {
+  font-size: 20px;
+}
+.mobile-text-2xl {
+  font-size: 24px;
+}
+.mobile-text-3xl {
+  font-size: 30px;
+}
+
+/* 移动端圆角 */
+.mobile-rounded {
+  border-radius: 8px;
+}
+.mobile-rounded-lg {
+  border-radius: 12px;
+}
+.mobile-rounded-xl {
+  border-radius: 16px;
+}
+.mobile-rounded-2xl {
+  border-radius: 20px;
+}
+.mobile-rounded-full {
+  border-radius: 50%;
+}
+
+/* 移动端阴影 */
+.mobile-shadow {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-shadow-lg {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* 移动端按钮样式 */
+.mobile-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+  border: none;
+  outline: none;
+}
+
+.mobile-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.mobile-btn-primary:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.mobile-btn-secondary {
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  backdrop-filter: blur(10px);
+}
+
+.mobile-btn-secondary:active {
+  transform: scale(0.98);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* 移动端输入框样式 */
+.mobile-input {
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  background: white;
+  transition: all 0.3s ease;
+}
+
+.mobile-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.mobile-input::placeholder {
+  color: #999;
+}
+
+/* 移动端卡片样式 */
+.mobile-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #f0f0f0;
+}
+
+/* 移动端网格布局 */
+.mobile-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.mobile-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+/* 响应式断点 */
+@media (max-width: 480px) {
+  .mobile-container {
+    padding: 0 15px;
+  }
+
+  .mobile-grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mobile-btn {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+
+  .mobile-input {
+    padding: 14px;
+    font-size: 16px; /* iOS 防止缩放 */
+  }
+}
+
+@media (max-width: 320px) {
+  .mobile-container {
+    padding: 0 10px;
+  }
+
+  .mobile-grid-2,
+  .mobile-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 动画效果 */
+@keyframes mobile-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-fade-in {
+  animation: mobile-fade-in 0.6s ease-out;
+}
+
+@keyframes mobile-bounce {
+  0%,
+  20%,
+  53%,
+  80%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  40%,
+  43% {
+    transform: translate3d(0, -8px, 0);
+  }
+  70% {
+    transform: translate3d(0, -4px, 0);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0);
+  }
+}
+
+.mobile-bounce {
+  animation: mobile-bounce 1s ease-in-out;
+}
+
+/* 移动端专用隐藏/显示 */
+.mobile-show {
+  display: block !important;
+}
+
+.mobile-hide {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .desktop-only {
+    display: none !important;
+  }
+}
+
+/* 移动端基础样式 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 37.5px; /* 基准字体大小，将被 JS 动态调整 */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  line-height: 1.5;
+  color: #333;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* 移动端容器 */
+.mobile-container {
+  max-width: 750px; /* 750px = 设计稿宽度，会转换为 20rem */
+  margin: 0 auto;
+  background: white;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 头部 */
+.mobile-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 60px 20px 30px; /* 考虑状态栏高度 */
+  text-align: center;
+}
+
+.mobile-header h1 {
+  font-size: 24px; /* 会转换为 rem */
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.mobile-header p {
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+/* 主内容 */
+.mobile-main {
+  flex: 1;
+  padding: 20px;
+}
+
+.demo-section {
+  background: white;
+  margin-bottom: 20px;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.demo-section h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: #333;
+  font-weight: 600;
+}
+
+/* 信息网格 */
+.info-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.info-item label {
+  font-weight: 500;
+  color: #666;
+}
+
+.user-agent {
+  font-size: 12px !important;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 控件样式 */
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.btn {
+  padding: 16px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #f8f9fa;
+  color: #333;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.input {
+  padding: 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 16px;
+  background: white;
+  transition: border-color 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.input-display {
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #999;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+}
+
+/* rem 演示盒子 */
+.rem-demo {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: white;
+  font-weight: bold;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.box.small {
+  width: 75px; /* 2rem */
+  height: 75px; /* 2rem */
+  background: #ff6b6b;
+}
+
+.box.medium {
+  width: 112px; /* 3rem */
+  height: 112px; /* 3rem */
+  background: #4ecdc4;
+}
+
+.box.large {
+  width: 150px; /* 4rem */
+  height: 150px; /* 4rem */
+  background: #45b7d1;
+}
+
+/* 底部 */
+.mobile-footer {
+  background: #f8f9fa;
+  padding: 20px;
+  text-align: center;
+  border-top: 1px solid #e9ecef;
+}
+
+.mobile-footer p {
+  font-size: 12px;
+  color: #666;
+}
+
+/* 响应式适配 */
+@media (max-width: 480px) {
+  .mobile-header {
+    padding: 50px 16px 20px;
+  }
+
+  .mobile-main {
+    padding: 16px;
+  }
+
+  .demo-section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .rem-demo {
+    flex-direction: column;
+  }
+}
+
+/* 横屏适配 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-header {
+    padding: 20px;
+  }
+
+  .mobile-header h1 {
+    font-size: 20px;
+  }
+}

@@ -15,6 +15,8 @@ export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
     exclude = ["src/main.ts", "src/vite-env.d.ts"],
     placeholder = "{{ENTRY_FILE}}",
     debug = false,
+    buildStrategies,
+    pageConfigs,
   } = options;
 
   const log = createLogger(debug);
@@ -28,7 +30,7 @@ export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
       if (command === "build") {
         createBuildConfig(
           config,
-          { entry, exclude, template, placeholder },
+          { entry, exclude, template, placeholder, buildStrategies, pageConfigs },
           log,
           tempFiles,
           pageMapping

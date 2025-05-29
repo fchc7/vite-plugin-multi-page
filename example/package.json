@@ -6,10 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "serve": "node server/koa-server.js",
+    "test": "node test-config.js"
   },
   "devDependencies": {
-    "vite": "^6.0.0",
-    "vite-plugin-multi-page": "^1.0.0"
+    "vite": "^5.4.0",
+    "postcss": "^8.4.35",
+    "postcss-pxtorem": "^6.0.0",
+    "autoprefixer": "^10.4.16",
+    "koa": "^2.14.2",
+    "koa-static": "^5.0.0",
+    "koa-router": "^12.0.1",
+    "glob": "^10.0.0",
+    "vue": "^3.5.13",
+    "@vitejs/plugin-vue": "^5.2.0"
   }
 }
