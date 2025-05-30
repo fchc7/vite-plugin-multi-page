@@ -29,4 +29,15 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'off', // 允许显式 any
   },
   ignorePatterns: ['dist/', 'node_modules/', '*.js'],
+  overrides: [
+    {
+      files: ['*.config.ts', '*.config.js'],
+      parserOptions: {
+        project: null,
+      },
+      rules: {
+        '@typescript-eslint/no-unused-vars': 'off',
+      },
+    },
+  ],
 };

@@ -13,6 +13,8 @@
 - 🔧 **完整 Vite 集成**：继承所有 Vite 配置选项
 - 🌍 **环境变量支持**：页面级和策略级环境变量定义
 - 🎨 **开发友好**：详细的调试日志和热重载支持
+- ⚡ **开发构建一致性**：确保开发模式与构建模式使用相同的配置逻辑
+- 🔄 **配置同步**：环境变量、模板选择、构建策略在开发和生产环境保持一致
 
 ## 📦 安装
 
@@ -280,69 +282,11 @@ interface PageConfig {
 }
 ```
 
-## 🌟 使用场景
+## ⚡ 开发与构建一致性
 
-### 1. 企业级多页应用
+### 配置同步机制
 
-```typescript
-buildStrategies: {
-  admin: {
-    viteConfig: {
-      define: { 'process.env.APP_TYPE': '"admin"' }
-    },
-    build: {
-      target: 'es2015',
-      sourcemap: true
-    }
-  },
-
-  public: {
-    viteConfig: {
-      define: { 'process.env.APP_TYPE': '"public"' }
-    },
-    build: {
-      target: 'es5',
-      minify: 'terser'
-    }
-  }
-}
-```
-
-### 2. 移动端优化
-
-```typescript
-buildStrategies: {
-  mobile: {
-    viteConfig: {
-      css: { devSourcemap: true },
-      optimizeDeps: { include: ['@mobile/utils'] }
-    },
-    build: {
-      target: 'es2018',
-      chunkSizeWarningLimit: 300,
-      cssCodeSplit: true
-    }
-  }
-}
-```
-
-### 3. 组件库开发
-
-```typescript
-buildStrategies: {
-  library: {
-    build: {
-      lib: {
-        entry: 'src/index.ts',
-        name: 'MyLibrary',
-        formats: ['es', 'umd']
-      },
-      minify: false,
-      sourcemap: true
-    }
-  }
-}
-```
+本插件确保开发模式与构建模式使用**完全相同的配置逻辑**，避免开发环境和生产环境的差异问题。
 
 ## 📱 示例项目
 
@@ -368,14 +312,6 @@ cd example
 npm install # 安装示例依赖
 npm run dev # 运行开发服务器
 ```
-
-### 示例页面
-
-构建后访问以下页面：
-
-- `/home.html` - 首页（默认策略）
-- `/about.html` - 关于页面（默认策略）
-- `/mobile.html` - 移动端页面（移动端模板）
 
 ## 🔧 开发
 

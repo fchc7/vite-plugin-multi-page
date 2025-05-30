@@ -1,14 +1,16 @@
 import type { Plugin } from 'vite';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { glob } from 'glob';
 import type { MultiPageOptions } from './types';
 import { createLogger } from './utils';
 import { configureDevServer } from './dev-server';
 import { createBuildConfig, createDevConfig } from './build-config';
+import { filterEntryFiles } from './file-filter';
 
 export type { MultiPageOptions };
 
-export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
+function viteMultiPage(options: MultiPageOptions = {}): Plugin {
   const {
     entry = 'src/**/*.{ts,js}',
     template = 'index.html',
@@ -37,11 +39,86 @@ export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
         );
       } else {
         createDevConfig({ entry, exclude }, log);
+
+        if (buildStrategies || pageConfigs) {
+          const allFiles = glob.sync(entry, { cwd: process.cwd() });
+          const entryFiles = filterEntryFiles(allFiles, entry, exclude, log);
+
+          const strategiesToApply = new Set<string>();
+
+          entryFiles.forEach(({ name, file }) => {
+            if (typeof pageConfigs === 'function') {
+              const pageConfig = pageConfigs({
+                pageName: name,
+                filePath: file,
+                relativePath: path.relative(process.cwd(), file),
+                strategy: undefined,
+                isMatched: false,
+              });
+              if (pageConfig?.strategy) {
+                strategiesToApply.add(pageConfig.strategy);
+              }
+            } else if (pageConfigs) {
+              const pageConfig = pageConfigs[name];
+              if (pageConfig?.strategy) {
+                strategiesToApply.add(pageConfig.strategy);
+              }
+            }
+          });
+
+          strategiesToApply.forEach(strategyName => {
+            const strategy = buildStrategies?.[strategyName];
+            if (strategy) {
+              log(`开发模式应用策略 ${strategyName}:`, strategy);
+
+              if (strategy.viteConfig) {
+                // 解构时跳过 build 属性，因为开发模式不需要构建配置
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { build, ...otherViteConfig } = strategy.viteConfig;
+                Object.keys(otherViteConfig).forEach(key => {
+                  if (key !== 'plugins') {
+                    const configKey = key as keyof typeof config;
+                    const viteConfigValue = otherViteConfig[key as keyof typeof otherViteConfig];
+                    if (viteConfigValue && typeof viteConfigValue === 'object') {
+                      config[configKey] = {
+                        ...(config[configKey] || {}),
+                        ...viteConfigValue,
+                      };
+                    } else {
+                      config[configKey] = viteConfigValue;
+                    }
+                  }
+                });
+              }
+
+              if (strategy.define) {
+                config.define = { ...config.define, ...strategy.define };
+              }
+              if (strategy.alias) {
+                config.resolve = config.resolve || {};
+                config.resolve.alias = { ...config.resolve.alias, ...strategy.alias };
+              }
+              if (strategy.server) {
+                config.server = { ...config.server, ...strategy.server };
+              }
+              if (strategy.css) {
+                config.css = { ...config.css, ...strategy.css };
+              }
+              if (strategy.optimizeDeps) {
+                config.optimizeDeps = { ...config.optimizeDeps, ...strategy.optimizeDeps };
+              }
+            }
+          });
+        }
       }
     },
 
     configureServer(server) {
-      configureDevServer(server, { entry, exclude, template, placeholder }, log);
+      configureDevServer(
+        server,
+        { entry, exclude, template, placeholder, buildStrategies, pageConfigs },
+        log
+      );
     },
 
     generateBundle() {
@@ -74,4 +151,8 @@ export default function viteMultiPage(options: MultiPageOptions = {}): Plugin {
   };
 }
 
+// 默认导出
+export default viteMultiPage;
+
+// 具名导出以支持 CommonJS 和 ESM
 export { viteMultiPage };

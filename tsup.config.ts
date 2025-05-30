@@ -9,4 +9,8 @@ export default defineConfig({
   clean: true,
   dts: true,
   external: ["vite", "glob"],
+  cjsInterop: true,
+  banner: {
+    js: '// @ts-nocheck',
+  },
 });
