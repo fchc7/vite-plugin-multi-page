@@ -24,6 +24,17 @@ document.addEventListener('DOMContentLoaded', function () {
   `;
   document.body.appendChild(envDisplay);
 
+  // 添加CSS测试元素
+  const cssTestElement = document.createElement('div');
+  cssTestElement.className = 'css-test-element';
+  cssTestElement.innerHTML = `
+    <h3>CSS配置测试</h3>
+    <p>这个元素使用不同策略的CSS变量测试</p>
+    <div class="test-mobile">移动端样式 (--mobile-root-value)</div>
+    <div class="test-pc">PC端样式 (--pc-root-value)</div>
+  `;
+  document.body.appendChild(cssTestElement);
+
   const app = document.getElementById('app');
 
   if (!app) return;
@@ -133,6 +144,46 @@ style.textContent = `
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+  }
+  
+  /* CSS测试元素样式 */
+  .css-test-element {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    width: 200px;
+    padding: 10px;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    z-index: 9999;
+  }
+  
+  /* 测试不同的CSS变量 */
+  .test-mobile {
+    margin-top: 8px;
+    padding: 5px;
+    background-color: #e6f7ff;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .test-pc {
+    margin-top: 8px;
+    padding: 5px;
+    background-color: #f6ffed;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  /* 显示实际计算值 */
+  .css-test-element:after {
+    content: "CSS变量可用性测试";
+    display: block;
+    margin-top: 10px;
+    font-weight: bold;
+    font-size: 12px;
   }
   
   body {
@@ -410,3 +461,16 @@ style.textContent = `
 `;
 
 document.head.appendChild(style);
+
+// 在页面加载完成后，计算并显示实际值
+window.addEventListener('load', function () {
+  const testElement = document.querySelector('.css-test-element');
+  if (testElement) {
+    const computedStyle = window.getComputedStyle(testElement);
+    testElement.setAttribute('data-width', computedStyle.width);
+    testElement.setAttribute('data-font-size', computedStyle.fontSize);
+
+    console.log('CSS测试 - 计算后宽度:', computedStyle.width);
+    console.log('CSS测试 - 计算后字体大小:', computedStyle.fontSize);
+  }
+});

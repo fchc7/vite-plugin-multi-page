@@ -25,6 +25,16 @@ export default defineConfig({
             __THEME__: JSON.stringify('green'),
             __VERSION__: JSON.stringify('1.0.0'),
           },
+          // 移动端CSS配置 - 使用更小的rootValue适合移动设备
+          css: {
+            // 避免直接设置postcss配置，而是使用一个预处理器选项
+            preprocessorOptions: {
+              scss: {
+                additionalData: 'body { --mobile-root-value: 37.5px; }',
+              },
+            },
+            devSourcemap: true,
+          },
         },
         home: {
           // 管理端环境变量
@@ -32,6 +42,16 @@ export default defineConfig({
             __MODE__: JSON.stringify('admin'),
             __THEME__: JSON.stringify('blue'),
             __VERSION__: JSON.stringify('1.0.0'),
+          },
+          // PC端CSS配置
+          css: {
+            // 避免直接设置postcss配置，而是使用一个预处理器选项
+            preprocessorOptions: {
+              scss: {
+                additionalData: 'body { --pc-root-value: 75px; }',
+              },
+            },
+            devSourcemap: true,
           },
         },
       },
