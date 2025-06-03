@@ -25,13 +25,13 @@ export default defineConfig({
             __THEME__: JSON.stringify('green'),
             __VERSION__: JSON.stringify('1.0.0'),
           },
-          // 移动端CSS配置 - 使用更小的rootValue适合移动设备
+          // 移动端CSS配置
           css: {
-            // 避免直接设置postcss配置，而是使用一个预处理器选项
-            preprocessorOptions: {
-              scss: {
-                additionalData: 'body { --mobile-root-value: 37.5px; }',
-              },
+            // 使用CSS modules选项区分不同策略
+            modules: {
+              scopeBehaviour: 'local',
+              localsConvention: 'camelCaseOnly',
+              generateScopedName: '[name]_[local]_mobile',
             },
             devSourcemap: true,
           },
@@ -45,11 +45,11 @@ export default defineConfig({
           },
           // PC端CSS配置
           css: {
-            // 避免直接设置postcss配置，而是使用一个预处理器选项
-            preprocessorOptions: {
-              scss: {
-                additionalData: 'body { --pc-root-value: 75px; }',
-              },
+            // 使用CSS modules选项区分不同策略
+            modules: {
+              scopeBehaviour: 'local',
+              localsConvention: 'camelCaseOnly',
+              generateScopedName: '[name]_[local]_pc',
             },
             devSourcemap: true,
           },

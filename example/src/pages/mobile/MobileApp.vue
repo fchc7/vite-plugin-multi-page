@@ -105,12 +105,30 @@
         <p class="rem-tip">点击盒子看动画效果！所有尺寸都会自动适配屏幕</p>
       </section>
 
-      <!-- 添加CSS测试元素 -->
+      <!-- CSS Module测试 -->
       <div class="css-test-element">
-        <h3>CSS配置测试</h3>
-        <p>这个元素使用不同策略的CSS变量测试</p>
-        <div class="test-mobile">移动端样式 (--mobile-root-value)</div>
-        <div class="test-pc">PC端样式 (--pc-root-value)</div>
+        <h3>CSS Modules 测试</h3>
+        <p>这个测试展示了不同策略下CSS Module的类名生成差异</p>
+
+        <div :class="styles.testBox">这是基础样式框 (.testBox)</div>
+
+        <div :class="[styles.testBox, styles.mobileStyle]">这是移动端样式 (.mobileStyle)</div>
+
+        <div :class="[styles.testBox, styles.pcStyle]">这是PC端样式 (.pcStyle)</div>
+
+        <div>
+          <strong>生成的类名:</strong>
+          <pre
+            style="
+              background: #f0f0f0;
+              padding: 5px;
+              margin-top: 5px;
+              overflow: auto;
+              font-size: 12px;
+            "
+            >{{ JSON.stringify(styles, null, 2) }}</pre
+          >
+        </div>
       </div>
     </main>
 
@@ -124,6 +142,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { version } from 'vue';
+import styles from '../test-styles.module.css';
 
 // 响应式数据
 const count = ref(0);
@@ -253,6 +272,8 @@ onMounted(() => {
       console.log('CSS测试 - 计算后字体大小:', computedStyle.fontSize);
     }
   }, 100);
+
+  console.log('加载的CSS Module:', styles);
 });
 
 onUnmounted(() => {
@@ -379,38 +400,27 @@ onUnmounted(() => {
   position: fixed;
   bottom: 10px;
   right: 10px;
-  width: 200px;
+  width: 300px;
   padding: 10px;
-  background: #f0f0f0;
+  background: #fff;
   border: 1px solid #ddd;
   border-radius: 5px;
-  font-size: 16px;
+  font-size: 14px;
   z-index: 9999;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+  overflow: auto;
+  max-height: 80vh;
 }
 
-/* 测试不同的CSS变量 */
-.test-mobile {
-  margin-top: 8px;
-  padding: 5px;
-  background-color: #e6f7ff;
-  border-radius: 4px;
-  font-size: 14px;
+.css-test-element h3 {
+  margin-bottom: 10px;
+  font-size: 16px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
 }
 
-.test-pc {
-  margin-top: 8px;
-  padding: 5px;
-  background-color: #f6ffed;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-/* 显示实际计算值 */
-.css-test-element:after {
-  content: 'CSS变量可用性测试';
-  display: block;
-  margin-top: 10px;
-  font-weight: bold;
-  font-size: 12px;
+.css-test-element p {
+  margin-bottom: 10px;
+  color: #666;
 }
 </style>
