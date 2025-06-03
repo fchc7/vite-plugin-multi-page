@@ -4,85 +4,21 @@ import * as fs from 'node:fs';
 import { glob } from 'glob';
 import { filterEntryFiles } from './file-filter';
 import { escapeRegExp } from './utils';
-import type { PageConfig, PageConfigFunction, PageConfigContext, BuildStrategy } from './types';
-
-function simpleMatch(pattern: string, text: string): boolean {
-  const regexPattern = pattern
-    .replace(/\*\*/g, '__DOUBLE_STAR__')
-    .replace(/\*/g, '[^/]*')
-    .replace(/__DOUBLE_STAR__/g, '.*');
-  const regex = new RegExp(`^${regexPattern}$`);
-  return regex.test(text);
-}
-
-function getPageConfig(
-  pageConfigs: Record<string, PageConfig> | PageConfigFunction | undefined,
-  context: PageConfigContext,
-  log: (...args: any[]) => void
-): PageConfig | null {
-  if (!pageConfigs) return null;
-
-  // 如果是函数，直接调用
-  if (typeof pageConfigs === 'function') {
-    const result = pageConfigs(context);
-    if (result) {
-      log(`函数配置匹配页面 ${context.pageName}:`, result);
-    }
-    return result;
-  }
-
-  // 对象配置：支持精确匹配和模式匹配
-  for (const [key, config] of Object.entries(pageConfigs)) {
-    // 精确匹配页面名称
-    if (key === context.pageName) {
-      log(`精确匹配页面 ${context.pageName}:`, config);
-      return config;
-    }
-
-    // 模式匹配
-    if (config.match) {
-      const patterns = Array.isArray(config.match) ? config.match : [config.match];
-      const isMatched = patterns.some(
-        pattern =>
-          simpleMatch(pattern, context.pageName) ||
-          simpleMatch(pattern, context.relativePath) ||
-          simpleMatch(pattern, context.filePath)
-      );
-
-      if (isMatched) {
-        log(`模式匹配页面 ${context.pageName} (模式: ${config.match}):`, config);
-        return { ...config, match: undefined };
-      }
-    }
-
-    // glob 模式匹配页面名称
-    if (simpleMatch(key, context.pageName)) {
-      log(`Glob匹配页面 ${context.pageName} (模式: ${key}):`, config);
-      return config;
-    }
-  }
-
-  return null;
-}
+import type { PageConfig, ConfigStrategy, DevServerOptions } from './types';
+import { getPageConfig } from './page-config';
 
 function applyDevStrategy(
   server: ViteDevServer,
-  strategy: BuildStrategy,
+  strategy: ConfigStrategy,
   log: (...args: any[]) => void
 ) {
   if (!strategy) return;
 
-  log('开发模式应用构建策略:', strategy);
+  log('开发模式记录配置策略配置(已在config钩子中应用):', strategy);
 
-  // 注意：开发服务器的配置在启动后是只读的
-  // 这里主要记录配置信息，实际应用需要在插件的 config 钩子中处理
-
+  // 记录策略配置，实际应用已在插件的config钩子中完成
   if (strategy.define) {
     log('开发环境变量配置:', strategy.define);
-  }
-
-  if (strategy.alias) {
-    log('开发别名配置:', strategy.alias);
   }
 
   if (strategy.server) {
@@ -100,14 +36,7 @@ function applyDevStrategy(
 
 export function configureDevServer(
   server: ViteDevServer,
-  options: {
-    entry: string;
-    exclude: string[];
-    template: string;
-    placeholder: string;
-    buildStrategies?: Record<string, BuildStrategy>;
-    pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
-  },
+  options: DevServerOptions,
   log: (...args: any[]) => void
 ) {
   const allFiles = glob.sync(options.entry, { cwd: process.cwd() });
@@ -129,7 +58,8 @@ export function configureDevServer(
       log
     );
 
-    const strategy = pageConfig?.strategy || 'default';
+    // 从传递的应用策略信息中获取，如果没有则使用配置或默认值
+    const strategy = options.appliedStrategies?.get(name) || pageConfig?.strategy || 'default';
 
     pageMap.set(name, {
       file,
@@ -137,18 +67,18 @@ export function configureDevServer(
       strategy,
     });
 
-    // 如果指定了构建策略，记录配置信息
-    if (options.buildStrategies && pageConfig?.strategy) {
-      const buildStrategy = options.buildStrategies[pageConfig.strategy];
-      if (buildStrategy) {
-        applyDevStrategy(server, buildStrategy, log);
+    // 如果指定了配置策略，记录配置信息（实际应用已在config钩子中完成）
+    if (options.configStrategies && pageConfig?.strategy) {
+      const configStrategy = options.configStrategies[pageConfig.strategy];
+      if (configStrategy) {
+        applyDevStrategy(server, configStrategy, log);
       }
     }
   });
 
   const pageNames = Array.from(pageMap.keys());
-  log('Available pages:', pageNames);
-  log('Page mapping with configs:', Object.fromEntries(pageMap));
+  log('可用页面:', pageNames);
+  log('页面配置映射:', Object.fromEntries(pageMap));
 
   server.middlewares.use((req: any, res: any, next: any) => {
     const originalUrl = req.url;
@@ -214,9 +144,30 @@ export function configureDevServer(
             html = html.replace(new RegExp(escapeRegExp(options.placeholder), 'g'), entryFile);
 
             // 应用页面级环境变量注入
+            let defineVars = {};
+
+            // 从策略中获取环境变量
+            if (
+              pageInfo.strategy &&
+              options.configStrategies &&
+              options.configStrategies[pageInfo.strategy]?.define
+            ) {
+              defineVars = { ...defineVars, ...options.configStrategies[pageInfo.strategy].define };
+              log(
+                `应用策略 ${pageInfo.strategy} 的环境变量:`,
+                options.configStrategies[pageInfo.strategy].define
+              );
+            }
+
+            // 页面配置的环境变量(优先级更高)
             if (pageConfig?.define) {
-              // 在HTML中注入环境变量
-              const defineScript = Object.entries(pageConfig.define)
+              defineVars = { ...defineVars, ...pageConfig.define };
+              log(`应用页面配置的环境变量:`, pageConfig.define);
+            }
+
+            // 在HTML中注入环境变量
+            if (Object.keys(defineVars).length > 0) {
+              const defineScript = Object.entries(defineVars)
                 .map(([key, value]) => `window.${key} = ${JSON.stringify(value)};`)
                 .join('\n');
 
@@ -226,7 +177,23 @@ export function configureDevServer(
                   ${defineScript}
                 </script>`;
                 html = html.replace('</head>', `${scriptTag}\n</head>`);
-                log(`注入页面环境变量:`, pageConfig.define);
+                log(`注入环境变量:`, defineVars);
+              }
+            }
+
+            // 如果HTML文件中不包含head标签，尝试在body开始处注入
+            if (Object.keys(defineVars).length > 0 && !html.includes('</head>')) {
+              const defineScript = Object.entries(defineVars)
+                .map(([key, value]) => `window.${key} = ${JSON.stringify(value)};`)
+                .join('\n');
+
+              if (defineScript) {
+                const scriptTag = `<script>
+                  // 页面级环境变量
+                  ${defineScript}
+                </script>`;
+                html = html.replace('<body>', `<body>\n${scriptTag}`);
+                log(`在body标签中注入环境变量:`, defineVars);
               }
             }
 

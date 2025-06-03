@@ -1,20 +1,11 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { glob } from 'glob';
+import { mergeConfig } from 'vite';
 import { filterEntryFiles } from './file-filter';
 import { escapeRegExp } from './utils';
-import type { BuildStrategy, PageConfig, PageConfigFunction, PageConfigContext } from './types';
-
-// 简单的 glob 模式匹配函数
-function simpleMatch(pattern: string, str: string): boolean {
-  const regexPattern = pattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&') // 转义特殊字符
-    .replace(/\*/g, '.*') // * 匹配任意字符
-    .replace(/\?/g, '.'); // ? 匹配单个字符
-
-  const regex = new RegExp(`^${regexPattern}$`);
-  return regex.test(str);
-}
+import type { ConfigStrategy, PageConfig, PageConfigFunction } from './types';
+import { getPageConfig } from './page-config';
 
 export function createBuildConfig(
   config: any,
@@ -23,7 +14,7 @@ export function createBuildConfig(
     exclude: string[];
     template: string;
     placeholder: string;
-    buildStrategies?: Record<string, BuildStrategy>;
+    configStrategies?: Record<string, ConfigStrategy>;
     pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
   },
   log: (...args: any[]) => void,
@@ -55,9 +46,11 @@ export function createBuildConfig(
   tempFiles.length = 0; // 清空数组
   pageMapping.clear();
 
-  // 分组页面按构建策略
+  // 分组页面按配置策略
   const strategyGroups: Record<string, typeof entryFiles> = {};
   const defaultStrategy = 'default';
+  // 存储每个页面对应的策略名称
+  const pageStrategyMap = new Map<string, string>();
 
   entryFiles.forEach(entryFile => {
     const { name, file } = entryFile;
@@ -76,6 +69,8 @@ export function createBuildConfig(
     );
 
     const strategy = pageConfig?.strategy || defaultStrategy;
+    // 记录页面对应的策略
+    pageStrategyMap.set(name, strategy);
 
     if (!strategyGroups[strategy]) {
       strategyGroups[strategy] = [];
@@ -106,181 +101,104 @@ export function createBuildConfig(
   log('Build input configuration:', input);
   log('Strategy groups:', Object.keys(strategyGroups));
 
-  // 应用构建策略
+  // 应用配置策略
   config.build = config.build || {};
   config.build.rollupOptions = config.build.rollupOptions || {};
   config.build.rollupOptions.input = input;
 
-  // 应用默认或指定的构建策略
-  const defaultStrategyConfig = options.buildStrategies?.[defaultStrategy];
+  // 应用默认或指定的配置策略
+  const defaultStrategyConfig = options.configStrategies?.[defaultStrategy];
   if (defaultStrategyConfig) {
-    applyBuildStrategy(config, defaultStrategyConfig, log);
+    applyConfigStrategy(config, defaultStrategyConfig, log);
   }
 
   // 如果只有一个策略组且不是默认策略，应用该策略
   const strategyKeys = Object.keys(strategyGroups);
   if (strategyKeys.length === 1 && strategyKeys[0] !== defaultStrategy) {
-    const singleStrategy = options.buildStrategies?.[strategyKeys[0]];
+    const singleStrategy = options.configStrategies?.[strategyKeys[0]];
     if (singleStrategy) {
-      applyBuildStrategy(config, singleStrategy, log);
+      applyConfigStrategy(config, singleStrategy, log);
     }
   }
+
+  // 多策略的情况下，需要为每个页面设置对应策略的环境变量
+  Object.keys(strategyGroups).forEach(strategyName => {
+    const strategy = options.configStrategies?.[strategyName];
+    if (strategy?.define) {
+      // 确保define配置存在
+      config.define = config.define || {};
+
+      // 将策略中的define配置应用到全局define中
+      Object.entries(strategy.define).forEach(([key, value]) => {
+        config.define[key] = value;
+        log(`应用策略 ${strategyName} 的环境变量 ${key}:`, value);
+      });
+    }
+  });
+
+  // 检查页面级配置中的define
+  entryFiles.forEach(({ name }) => {
+    const pageConfig = getPageConfig(
+      options.pageConfigs,
+      {
+        pageName: name,
+        filePath: '',
+        relativePath: '',
+        strategy: pageStrategyMap.get(name),
+        isMatched: true,
+      },
+      log
+    );
+
+    // 页面级define (优先级更高)
+    if (pageConfig?.define) {
+      config.define = config.define || {};
+      Object.entries(pageConfig.define).forEach(([key, value]) => {
+        config.define[key] = value;
+        log(`应用页面 ${name} 的环境变量 ${key}:`, value);
+      });
+    }
+  });
 
   // 处理多策略情况（需要多次构建）
   if (
     strategyKeys.length > 1 ||
     (strategyKeys.length === 1 &&
       strategyKeys[0] !== defaultStrategy &&
-      options.buildStrategies?.[strategyKeys[0]])
+      options.configStrategies?.[strategyKeys[0]])
   ) {
-    log('检测到多构建策略，将创建策略映射');
+    log('检测到多配置策略，将创建策略映射');
     // 在插件实例上存储策略信息，供后续处理
     (config as any).__multiPageStrategies = {
       groups: strategyGroups,
-      strategies: options.buildStrategies,
+      strategies: options.configStrategies,
       pageConfigs: options.pageConfigs,
     };
   }
 }
 
-function getPageConfig(
-  pageConfigs: Record<string, PageConfig> | PageConfigFunction | undefined,
-  context: PageConfigContext,
-  log: (...args: any[]) => void
-): PageConfig | null {
-  if (!pageConfigs) return null;
+function applyConfigStrategy(config: any, strategy: ConfigStrategy, log: (...args: any[]) => void) {
+  log('应用配置策略:', strategy);
 
-  // 如果是函数，直接调用
-  if (typeof pageConfigs === 'function') {
-    const result = pageConfigs(context);
-    if (result) {
-      log(`函数配置匹配页面 ${context.pageName}:`, result);
+  // 使用Vite的mergeConfig合并配置
+  const mergedConfig = mergeConfig(config, strategy);
+
+  // 将合并后的配置赋值回原配置，排除plugins以避免冲突
+  Object.keys(mergedConfig).forEach(key => {
+    if (key !== 'plugins') {
+      config[key] = mergedConfig[key];
     }
-    return result;
-  }
+  });
 
-  // 对象配置：支持精确匹配和模式匹配
-  for (const [key, config] of Object.entries(pageConfigs)) {
-    // 精确匹配页面名称
-    if (key === context.pageName) {
-      log(`精确匹配页面 ${context.pageName}:`, config);
-      return config;
-    }
-
-    // 模式匹配
-    if (config.match) {
-      const patterns = Array.isArray(config.match) ? config.match : [config.match];
-      const isMatched = patterns.some(
-        pattern =>
-          simpleMatch(pattern, context.pageName) ||
-          simpleMatch(pattern, context.relativePath) ||
-          simpleMatch(pattern, context.filePath)
-      );
-
-      if (isMatched) {
-        log(`模式匹配页面 ${context.pageName} (模式: ${config.match}):`, config);
-        return { ...config, match: undefined }; // 移除 match 属性避免传递给构建配置
-      }
-    }
-
-    // glob 模式匹配页面名称
-    if (simpleMatch(key, context.pageName)) {
-      log(`Glob匹配页面 ${context.pageName} (模式: ${key}):`, config);
-      return config;
-    }
-  }
-
-  return null;
-}
-
-function applyBuildStrategy(config: any, strategy: BuildStrategy, log: (...args: any[]) => void) {
-  log('应用构建策略:', strategy);
-
-  // 应用完整的 Vite 配置
-  if (strategy.viteConfig) {
-    const { build: viteBuild, ...otherViteConfig } = strategy.viteConfig;
-
-    // 合并非构建配置
-    Object.keys(otherViteConfig).forEach(key => {
-      if (key !== 'plugins') {
-        // 跳过 plugins，避免冲突
-        const configKey = key as keyof typeof config;
-        const viteConfigValue = otherViteConfig[key as keyof typeof otherViteConfig];
-        if (viteConfigValue && typeof viteConfigValue === 'object') {
-          config[configKey] = {
-            ...(config[configKey] || {}),
-            ...viteConfigValue,
-          };
-        } else {
-          config[configKey] = viteConfigValue;
-        }
-      }
-    });
-
-    // 合并构建配置
-    if (viteBuild) {
-      config.build = {
-        ...config.build,
-        ...viteBuild,
-      };
-    }
-  }
-
-  // 应用输出配置
-  if (strategy.output) {
-    config.build.rollupOptions.output = {
-      ...config.build.rollupOptions.output,
-      ...strategy.output,
-    };
-  }
-
-  // 应用构建配置
-  if (strategy.build) {
-    config.build = {
-      ...config.build,
-      ...strategy.build,
-    };
-  }
-
-  // 应用环境变量
+  // 确保define值被正确处理
   if (strategy.define) {
-    config.define = {
-      ...config.define,
-      ...strategy.define,
-    };
-  }
-
-  // 应用别名配置
-  if (strategy.alias) {
-    config.resolve = config.resolve || {};
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      ...strategy.alias,
-    };
-  }
-
-  // 应用服务器配置
-  if (strategy.server) {
-    config.server = {
-      ...config.server,
-      ...strategy.server,
-    };
-  }
-
-  // 应用 CSS 配置
-  if (strategy.css) {
-    config.css = {
-      ...config.css,
-      ...strategy.css,
-    };
-  }
-
-  // 应用优化依赖配置
-  if (strategy.optimizeDeps) {
-    config.optimizeDeps = {
-      ...config.optimizeDeps,
-      ...strategy.optimizeDeps,
-    };
+    config.define = config.define || {};
+    // 通过Vite的标准define配置，确保构建时环境变量替换
+    Object.entries(strategy.define).forEach(([key, value]) => {
+      // 确保值被正确处理 - 直接赋值，Vite会处理字符串化
+      config.define[key] = value;
+      log(`设置环境变量 ${key}:`, value);
+    });
   }
 }
 

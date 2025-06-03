@@ -64,7 +64,7 @@ project/
 
 ## 🎯 Advanced Configuration
 
-### Multiple Build Strategies
+### Advanced Configuration
 
 ```typescript
 import { defineConfig } from 'vite';
@@ -74,132 +74,82 @@ export default defineConfig({
   plugins: [
     viteMultiPage({
       entry: 'src/pages/**/*.{ts,js}',
+      template: 'index.html',
 
-      // Define build strategies
-      buildStrategies: {
+      // Define configuration strategies
+      configStrategies: {
         // Modern browser strategy
         default: {
-          viteConfig: {
-            define: {
-              'process.env.BUILD_TYPE': '"modern"',
-            },
-          },
-          output: {
-            format: 'es',
-            entryFileNames: 'assets/[name]-[hash].js',
+          define: {
+            'process.env.BUILD_TYPE': '"modern"',
           },
           build: {
             target: 'es2015',
             minify: 'esbuild',
             sourcemap: true,
+            rollupOptions: {
+              output: {
+                format: 'es',
+                entryFileNames: 'assets/[name]-[hash].js',
+              },
+            },
           },
         },
 
-        // Legacy compatibility strategy
+        // Legacy browser compatibility
         legacy: {
-          viteConfig: {
-            define: {
-              'process.env.BUILD_TYPE': '"legacy"',
-            },
-          },
-          output: {
-            format: 'iife',
-            entryFileNames: 'legacy/[name].js',
+          define: {
+            'process.env.BUILD_TYPE': '"legacy"',
           },
           build: {
             target: 'es5',
             minify: 'terser',
             sourcemap: false,
+            rollupOptions: {
+              output: {
+                format: 'iife',
+                entryFileNames: 'legacy/[name].js',
+              },
+            },
           },
         },
 
-        // Mobile optimization strategy
+        // Mobile optimization
         mobile: {
-          viteConfig: {
-            css: {
-              devSourcemap: true,
-            },
-            optimizeDeps: {
-              include: ['mobile-utils'],
-            },
+          define: {
+            __MOBILE__: 'true',
+            __THEME__: '"dark"',
           },
-          build: {
-            target: 'es2018',
-            chunkSizeWarningLimit: 300,
+          css: {
+            devSourcemap: true,
+          },
+          optimizeDeps: {
+            include: ['mobile-utils'],
+          },
+        },
+      },
+
+      // Page-specific configurations
+      pageConfigs: {
+        // Using match patterns
+        'admin-pages': {
+          match: ['admin*', '**/admin/**'],
+          strategy: 'default',
+          template: 'admin.html',
+        },
+
+        // Mobile pages
+        'mobile-app': {
+          match: '**/mobile/**',
+          strategy: 'mobile',
+          template: 'mobile.html',
+          define: {
+            __PAGE_TYPE__: '"app"',
           },
         },
       },
     }),
   ],
-});
-```
-
-### Function Configuration
-
-```typescript
-viteMultiPage({
-  entry: 'src/pages/**/*.{ts,js}',
-
-  // Use function for dynamic configuration
-  pageConfigs: context => {
-    const { pageName, filePath, relativePath } = context;
-
-    // Admin pages
-    if (pageName.startsWith('admin')) {
-      return {
-        strategy: 'default',
-        template: 'admin.html',
-        define: {
-          'process.env.API_BASE': '"https://admin-api.example.com"',
-        },
-      };
-    }
-
-    // Mobile pages
-    if (relativePath.includes('/mobile/')) {
-      return {
-        strategy: 'mobile',
-        template: 'mobile.html',
-        define: {
-          'process.env.API_BASE': '"https://mobile-api.example.com"',
-        },
-      };
-    }
-
-    // Default configuration
-    return {
-      strategy: 'default',
-    };
-  },
-});
-```
-
-### Object Configuration with Pattern Matching
-
-```typescript
-viteMultiPage({
-  entry: 'src/pages/**/*.{ts,js}',
-
-  pageConfigs: {
-    // Exact match
-    home: {
-      strategy: 'default',
-      template: 'home.html',
-    },
-
-    // Wildcard match
-    'admin*': {
-      strategy: 'default',
-      template: 'admin.html',
-    },
-
-    // Pattern match
-    'mobile-app': {
-      strategy: 'mobile',
-      match: ['**/mobile/**', '*mobile*'],
-      template: 'mobile.html',
-    },
-  },
 });
 ```
 
@@ -220,76 +170,42 @@ viteMultiPage({
 ### BuildStrategy
 
 ```typescript
-interface BuildStrategy {
-  // Full Vite configuration support
-  viteConfig?: Omit<UserConfig, 'plugins' | 'build'> & {
-    build?: BuildOptions;
-  };
-
-  // Output configuration
-  output?: {
-    format?: 'es' | 'cjs' | 'umd' | 'iife';
-    dir?: string;
-    entryFileNames?: string;
-    chunkFileNames?: string;
-    assetFileNames?: string;
-    globals?: Record<string, string>;
-    external?: string | string[] | ((id: string) => boolean);
-  };
-
-  // Build configuration
-  build?: {
-    target?: string | string[];
-    minify?: boolean | 'terser' | 'esbuild';
-    sourcemap?: boolean | 'inline' | 'hidden';
-    lib?: boolean | LibraryOptions;
-    cssCodeSplit?: boolean;
-    cssTarget?: string | string[];
-    rollupOptions?: any;
-    // ... more Vite build options
-  };
-
-  // Environment variables
-  define?: Record<string, any>;
-
-  // Alias configuration
-  alias?: Record<string, string>;
-
-  // Server configuration
-  server?: ServerOptions;
-
-  // CSS configuration
-  css?: CSSOptions;
-
-  // Dependency optimization
-  optimizeDeps?: DepOptimizationOptions;
+// Configuration Strategy - Simplified, directly extends Vite config
+interface ConfigStrategy extends Omit<UserConfig, 'plugins'> {
+  // Uses Vite's standard configuration structure
+  // For example:
+  // - define: Environment variables
+  // - build: Build configuration
+  // - css: CSS configuration
+  // - server: Server configuration
+  // - optimizeDeps: Dependency optimization
+  // etc...
 }
 ```
+
+> **Note**: The configuration strategy interface has been simplified to directly extend Vite's `UserConfig`. This allows you to use Vite's standard configuration structure without additional nesting. The functionality of the previous `output` property can now be achieved using `build.rollupOptions.output`.
 
 ### PageConfig
 
 ```typescript
 interface PageConfig {
-  strategy?: string; // Build strategy to use
-  template?: string; // Page template
-  exclude?: string[]; // Exclude rules
-  define?: Record<string, any>; // Environment variables
-  alias?: Record<string, string>; // Aliases
-  build?: Partial<BuildStrategy['build']>; // Build configuration
-  match?: string | string[]; // Match patterns
+  strategy?: string; // Specifies which configuration strategy to use
+  template?: string; // Specifies which HTML template to use
+  define?: Record<string, any>; // Page-level environment variables
+  match?: string | string[]; // Used for pattern matching
 }
 ```
+
+> **Note**: The PageConfig interface has been simplified to only include core properties that are actually used. Unused properties like `exclude`, `alias`, and `build` have been removed, making the interface cleaner and more focused.
 
 ## 🌟 Use Cases
 
 ### 1. Enterprise Multi-Page Application
 
 ```typescript
-buildStrategies: {
+configStrategies: {
   admin: {
-    viteConfig: {
-      define: { 'process.env.APP_TYPE': '"admin"' }
-    },
+    define: { 'process.env.APP_TYPE': '"admin"' },
     build: {
       target: 'es2015',
       sourcemap: true
@@ -297,9 +213,7 @@ buildStrategies: {
   },
 
   public: {
-    viteConfig: {
-      define: { 'process.env.APP_TYPE': '"public"' }
-    },
+    define: { 'process.env.APP_TYPE': '"public"' },
     build: {
       target: 'es5',
       minify: 'terser'
@@ -311,12 +225,10 @@ buildStrategies: {
 ### 2. Mobile Optimization
 
 ```typescript
-buildStrategies: {
+configStrategies: {
   mobile: {
-    viteConfig: {
-      css: { devSourcemap: true },
-      optimizeDeps: { include: ['@mobile/utils'] }
-    },
+    css: { devSourcemap: true },
+    optimizeDeps: { include: ['@mobile/utils'] },
     build: {
       target: 'es2018',
       chunkSizeWarningLimit: 300,
@@ -329,7 +241,7 @@ buildStrategies: {
 ### 3. Component Library Development
 
 ```typescript
-buildStrategies: {
+configStrategies: {
   library: {
     build: {
       lib: {

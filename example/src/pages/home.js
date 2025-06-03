@@ -1,5 +1,29 @@
 // 首页应用
 document.addEventListener('DOMContentLoaded', function () {
+  // 检查环境变量
+  console.log('环境变量检查:');
+  console.log('__MODE__:', __MODE__);
+  console.log('__THEME__:', __THEME__);
+  console.log('__VERSION__:', __VERSION__);
+
+  // 创建环境变量显示元素
+  const envDisplay = document.createElement('div');
+  envDisplay.style.position = 'fixed';
+  envDisplay.style.top = '10px';
+  envDisplay.style.right = '10px';
+  envDisplay.style.padding = '10px';
+  envDisplay.style.background = 'rgba(255,255,255,0.7)';
+  envDisplay.style.zIndex = '9999';
+  envDisplay.style.borderRadius = '8px';
+  envDisplay.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+  envDisplay.innerHTML = `
+    <div style="margin-bottom:8px"><strong>环境变量:</strong></div>
+    <div>MODE: ${__MODE__}</div>
+    <div>THEME: ${__THEME__}</div>
+    <div>VERSION: ${__VERSION__}</div>
+  `;
+  document.body.appendChild(envDisplay);
+
   const app = document.getElementById('app');
 
   if (!app) return;

@@ -1,4 +1,4 @@
-import type { UserConfig, BuildOptions } from 'vite';
+import type { UserConfig } from 'vite';
 
 export interface MultiPageOptions {
   entry?: string;
@@ -6,81 +6,30 @@ export interface MultiPageOptions {
   exclude?: string[];
   placeholder?: string;
   debug?: boolean;
-  buildStrategies?: Record<string, BuildStrategy>;
+  configStrategies?: Record<string, ConfigStrategy>;
   pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
 }
 
-export interface BuildStrategy {
-  viteConfig?: Omit<UserConfig, 'plugins' | 'build'> & {
-    build?: BuildOptions;
-  };
+export interface DevServerOptions {
+  entry: string;
+  exclude: string[];
+  template: string;
+  placeholder: string;
+  configStrategies?: Record<string, ConfigStrategy>;
+  pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
+  appliedStrategies?: Map<string, string>;
+}
 
-  output?: {
-    format?: 'es' | 'cjs' | 'umd' | 'iife';
-    dir?: string;
-    entryFileNames?: string;
-    chunkFileNames?: string;
-    assetFileNames?: string;
-    globals?: Record<string, string>;
-    external?: string | string[] | ((id: string) => boolean);
-  };
-
-  build?: {
-    target?: string | string[];
-    minify?: boolean | 'terser' | 'esbuild';
-    sourcemap?: boolean | 'inline' | 'hidden';
-    lib?:
-      | boolean
-      | {
-          entry: string | string[] | { [entryAlias: string]: string };
-          name?: string;
-          formats?: ('es' | 'cjs' | 'umd' | 'iife')[];
-          fileName?: string | ((format: string, entryName: string) => string);
-        };
-    cssCodeSplit?: boolean;
-    cssTarget?: string | string[];
-    rollupOptions?: any;
-    reportCompressedSize?: boolean;
-    chunkSizeWarningLimit?: number;
-    assetsDir?: string;
-    emptyOutDir?: boolean;
-  };
-
-  define?: Record<string, any>;
-
-  alias?: Record<string, string>;
-
-  server?: {
-    port?: number;
-    host?: string | boolean;
-    https?: boolean;
-    cors?: boolean;
-    headers?: Record<string, string>;
-  };
-
-  css?: {
-    modules?: any;
-    postcss?: any;
-    preprocessorOptions?: Record<string, any>;
-    devSourcemap?: boolean;
-  };
-
-  optimizeDeps?: {
-    entries?: string | string[];
-    exclude?: string[];
-    include?: string[];
-    esbuildOptions?: any;
-  };
+export interface ConfigStrategy extends Omit<UserConfig, 'plugins'> {
+  // 移除output属性，完全使用Vite标准配置结构
 }
 
 export interface PageConfigBase {
-  strategy?: string;
-  template?: string;
-  exclude?: string[];
-  define?: Record<string, any>;
-  alias?: Record<string, string>;
-  build?: Partial<BuildStrategy['build']>;
-  match?: string | string[];
+  // 保留核心属性
+  strategy?: string; // 指定使用哪个配置策略
+  template?: string; // 指定使用的HTML模板
+  define?: Record<string, any>; // 页面级环境变量
+  match?: string | string[]; // 用于模式匹配
 }
 
 export interface PageConfig extends PageConfigBase {}

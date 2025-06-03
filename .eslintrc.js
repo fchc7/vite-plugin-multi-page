@@ -28,7 +28,7 @@ module.exports = {
     'no-var': 'error',
     '@typescript-eslint/no-explicit-any': 'off', // 允许显式 any
   },
-  ignorePatterns: ['dist/', 'node_modules/', '*.js'],
+  ignorePatterns: ['dist/', 'node_modules/', '*.js', 'example/'],
   overrides: [
     {
       files: ['*.config.ts', '*.config.js'],

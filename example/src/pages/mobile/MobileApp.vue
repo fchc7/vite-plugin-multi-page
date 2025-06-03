@@ -38,8 +38,8 @@
         <h2>🎛️ Vue 交互演示</h2>
         <div class="controls">
           <!-- 计数器 -->
-          <button 
-            @click="incrementCount" 
+          <button
+            @click="incrementCount"
             class="mobile-btn mobile-btn-primary"
             :class="{ 'mobile-bounce': isAnimating }"
           >
@@ -47,9 +47,9 @@
           </button>
 
           <!-- 输入框 -->
-          <input 
+          <input
             v-model="inputText"
-            type="text" 
+            type="text"
             class="mobile-input"
             placeholder="输入一些文字..."
             @focus="onInputFocus"
@@ -62,10 +62,7 @@
           </div>
 
           <!-- 切换主题 -->
-          <button 
-            @click="toggleTheme" 
-            class="mobile-btn mobile-btn-secondary"
-          >
+          <button @click="toggleTheme" class="mobile-btn mobile-btn-secondary">
             {{ isDarkTheme ? '🌙 深色主题' : '☀️ 浅色主题' }}
           </button>
         </div>
@@ -82,19 +79,10 @@
 
           <!-- 数据绑定演示 -->
           <div class="data-binding">
-            <input 
-              v-model="sliderValue" 
-              type="range" 
-              min="0" 
-              max="100" 
-              class="slider"
-            />
+            <input v-model="sliderValue" type="range" min="0" max="100" class="slider" />
             <p>滑块值: {{ sliderValue }}%</p>
             <div class="progress-bar">
-              <div 
-                class="progress-fill" 
-                :style="{ width: sliderValue + '%' }"
-              ></div>
+              <div class="progress-fill" :style="{ width: sliderValue + '%' }"></div>
             </div>
           </div>
         </div>
@@ -104,26 +92,14 @@
       <section class="demo-section mobile-fade-in">
         <h2>📐 PostCSS rem 演示</h2>
         <div class="rem-demo">
-          <div 
-            class="box small" 
-            :style="boxStyle.small"
-            @click="animateBox('small')"
-          >
-            小盒子<br>75px → 2rem
+          <div class="box small" :style="boxStyle.small" @click="animateBox('small')">
+            小盒子<br />75px → 2rem
           </div>
-          <div 
-            class="box medium" 
-            :style="boxStyle.medium"
-            @click="animateBox('medium')"
-          >
-            中盒子<br>112px → 3rem
+          <div class="box medium" :style="boxStyle.medium" @click="animateBox('medium')">
+            中盒子<br />112px → 3rem
           </div>
-          <div 
-            class="box large" 
-            :style="boxStyle.large"
-            @click="animateBox('large')"
-          >
-            大盒子<br>150px → 4rem
+          <div class="box large" :style="boxStyle.large" @click="animateBox('large')">
+            大盒子<br />150px → 4rem
           </div>
         </div>
         <p class="rem-tip">点击盒子看动画效果！所有尺寸都会自动适配屏幕</p>
@@ -155,14 +131,14 @@ const deviceInfo = reactive({
   screenWidth: window.innerWidth,
   fontSize: '37.5',
   pixelRatio: window.devicePixelRatio || 1,
-  userAgent: navigator.userAgent.includes('Mobile') ? '移动设备' : '桌面设备'
+  userAgent: navigator.userAgent.includes('Mobile') ? '移动设备' : '桌面设备',
 });
 
 // 盒子动画状态
 const boxAnimations = reactive({
   small: false,
   medium: false,
-  large: false
+  large: false,
 });
 
 // 计算属性
@@ -175,7 +151,7 @@ const displayText = computed(() => {
 const inputDisplayStyle = computed(() => ({
   color: inputText.value.trim() ? '#333' : '#999',
   borderColor: isInputFocused.value ? '#667eea' : 'transparent',
-  transform: isInputFocused.value ? 'scale(1.02)' : 'scale(1)'
+  transform: isInputFocused.value ? 'scale(1.02)' : 'scale(1)',
 }));
 
 const buildTime = computed(() => {
@@ -185,22 +161,22 @@ const buildTime = computed(() => {
 const boxStyle = computed(() => ({
   small: {
     transform: boxAnimations.small ? 'scale(1.1) rotate(5deg)' : 'scale(1)',
-    background: boxAnimations.small ? '#ff8a8a' : '#ff6b6b'
+    background: boxAnimations.small ? '#ff8a8a' : '#ff6b6b',
   },
   medium: {
     transform: boxAnimations.medium ? 'scale(1.1) rotate(-5deg)' : 'scale(1)',
-    background: boxAnimations.medium ? '#5eede4' : '#4ecdc4'
+    background: boxAnimations.medium ? '#5eede4' : '#4ecdc4',
   },
   large: {
     transform: boxAnimations.large ? 'scale(1.1) rotate(5deg)' : 'scale(1)',
-    background: boxAnimations.large ? '#60c5f1' : '#45b7d1'
-  }
+    background: boxAnimations.large ? '#60c5f1' : '#45b7d1',
+  },
 }));
 
 // 方法
 function incrementCount() {
   count.value++;
-  
+
   // 添加动画效果
   isAnimating.value = true;
   setTimeout(() => {
@@ -230,9 +206,7 @@ function animateBox(boxType: 'small' | 'medium' | 'large') {
 
 function updateDeviceInfo() {
   deviceInfo.screenWidth = window.innerWidth;
-  deviceInfo.fontSize = parseFloat(
-    getComputedStyle(document.documentElement).fontSize
-  ).toFixed(1);
+  deviceInfo.fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize).toFixed(1);
 }
 
 function updateTime() {
@@ -246,17 +220,17 @@ let resizeHandler: () => void;
 onMounted(() => {
   // 更新设备信息
   updateDeviceInfo();
-  
+
   // 启动时钟
   updateTime();
   timeInterval = setInterval(updateTime, 1000);
-  
+
   // 监听窗口大小变化
   resizeHandler = () => {
     updateDeviceInfo();
   };
   window.addEventListener('resize', resizeHandler);
-  
+
   console.log('📱 Vue 移动端组件已挂载');
 });
 
@@ -268,7 +242,7 @@ onUnmounted(() => {
   if (resizeHandler) {
     window.removeEventListener('resize', resizeHandler);
   }
-  
+
   console.log('📱 Vue 移动端组件已卸载');
 });
 </script>
@@ -378,4 +352,4 @@ onUnmounted(() => {
   background: #4a5568;
   color: #e2e8f0;
 }
-</style> 
+</style>

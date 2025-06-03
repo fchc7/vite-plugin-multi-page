@@ -78,52 +78,50 @@ export default defineConfig({
       entry: 'src/pages/**/*.{ts,js}',
 
       // 定义构建策略
-      buildStrategies: {
+      configStrategies: {
         // 现代浏览器策略
         default: {
-          viteConfig: {
-            define: {
-              'process.env.BUILD_TYPE': '"modern"',
-            },
-          },
-          output: {
-            format: 'es',
-            entryFileNames: 'assets/[name]-[hash].js',
+          define: {
+            'process.env.BUILD_TYPE': '"modern"',
           },
           build: {
             target: 'es2015',
             minify: 'esbuild',
             sourcemap: true,
+            rollupOptions: {
+              output: {
+                format: 'es',
+                entryFileNames: 'assets/[name]-[hash].js',
+              },
+            },
           },
         },
 
         // 兼容模式策略
         legacy: {
-          viteConfig: {
-            define: {
-              'process.env.BUILD_TYPE': '"legacy"',
-            },
-          },
-          output: {
-            format: 'iife',
-            entryFileNames: 'legacy/[name].js',
+          define: {
+            'process.env.BUILD_TYPE': '"legacy"',
           },
           build: {
             target: 'es5',
             minify: 'terser',
             sourcemap: false,
+            rollupOptions: {
+              output: {
+                format: 'iife',
+                entryFileNames: 'legacy/[name].js',
+              },
+            },
           },
         },
 
         // 移动端优化策略
         mobile: {
-          viteConfig: {
-            css: {
-              devSourcemap: true,
-            },
-            optimizeDeps: {
-              include: ['mobile-utils'],
-            },
+          css: {
+            devSourcemap: true,
+          },
+          optimizeDeps: {
+            include: ['mobile-utils'],
           },
           build: {
             target: 'es2018',
@@ -222,65 +220,33 @@ viteMultiPage({
 ### BuildStrategy
 
 ```typescript
-interface BuildStrategy {
-  // 完整的 Vite 配置支持
-  viteConfig?: Omit<UserConfig, 'plugins' | 'build'> & {
-    build?: BuildOptions;
-  };
-
-  // 输出配置
-  output?: {
-    format?: 'es' | 'cjs' | 'umd' | 'iife';
-    dir?: string;
-    entryFileNames?: string;
-    chunkFileNames?: string;
-    assetFileNames?: string;
-    globals?: Record<string, string>;
-    external?: string | string[] | ((id: string) => boolean);
-  };
-
-  // 构建配置
-  build?: {
-    target?: string | string[];
-    minify?: boolean | 'terser' | 'esbuild';
-    sourcemap?: boolean | 'inline' | 'hidden';
-    lib?: boolean | LibraryOptions;
-    cssCodeSplit?: boolean;
-    cssTarget?: string | string[];
-    rollupOptions?: any;
-    // ... 更多 Vite 构建选项
-  };
-
-  // 环境变量
-  define?: Record<string, any>;
-
-  // 别名配置
-  alias?: Record<string, string>;
-
-  // 服务器配置
-  server?: ServerOptions;
-
-  // CSS 配置
-  css?: CSSOptions;
-
-  // 依赖优化
-  optimizeDeps?: DepOptimizationOptions;
+// 配置策略 - 简化版，直接继承Vite配置
+interface ConfigStrategy extends Omit<UserConfig, 'plugins'> {
+  // 直接使用Vite的标准配置结构
+  // 例如:
+  // - define: 定义环境变量
+  // - build: 构建配置
+  // - css: CSS配置
+  // - server: 服务器配置
+  // - optimizeDeps: 依赖优化
+  // 等等...
 }
 ```
+
+> **注意**: 配置策略接口已简化，直接继承自Vite的`UserConfig`。这样您可以直接使用Vite的标准配置结构，无需额外的嵌套。旧版本中的`output`属性功能可以通过`build.rollupOptions.output`实现。
 
 ### PageConfig
 
 ```typescript
 interface PageConfig {
-  strategy?: string; // 使用的构建策略
-  template?: string; // 页面模板
-  exclude?: string[]; // 排除规则
-  define?: Record<string, any>; // 环境变量
-  alias?: Record<string, string>; // 别名
-  build?: Partial<BuildStrategy['build']>; // 构建配置
-  match?: string | string[]; // 匹配模式
+  strategy?: string; // 指定使用哪个配置策略
+  template?: string; // 指定使用的HTML模板
+  define?: Record<string, any>; // 页面级环境变量
+  match?: string | string[]; // 用于模式匹配
 }
 ```
+
+> **注意**: PageConfig接口已简化，只保留了实际使用的核心属性。移除了未使用的`exclude`、`alias`和`build`属性，使接口更加清晰和聚焦。
 
 ## ⚡ 开发与构建一致性
 
