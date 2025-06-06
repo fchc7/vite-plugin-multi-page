@@ -16,7 +16,7 @@ A powerful Vite plugin for building multi-page applications with smart file rout
 ## Installation
 
 ```bash
-npm install vite-plugin-multi-page --save-dev
+npm install @fchc8/vite-plugin-multi-page --save-dev
 ```
 
 ## Quick Start

@@ -16,7 +16,7 @@
 ## 安装
 
 ```bash
-npm install vite-plugin-multi-page --save-dev
+npm install @fchc8/vite-plugin-multi-page --save-dev
 ```
 
 ## 快速开始
