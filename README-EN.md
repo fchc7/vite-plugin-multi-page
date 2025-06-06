@@ -1,4 +1,4 @@
-# vite-plugin-multi-page
+# @fchc8/vite-plugin-multi-page
 
 > 中文文档 | [中文文档](./README.md)
 
@@ -105,7 +105,7 @@ Add the plugin in `vite.config.ts`:
 
 ```typescript
 import { defineConfig } from 'vite';
-import viteMultiPage from 'vite-plugin-multi-page';
+import { viteMultiPage } from '@fchc8/vite-plugin-multi-page';
 
 export default defineConfig({
   plugins: [viteMultiPage()],
@@ -218,7 +218,7 @@ The plugin fully supports TypeScript configuration files:
 
 ```typescript
 // multipage.config.ts
-import type { ConfigFunction } from 'vite-plugin-multi-page';
+import type { ConfigFunction } from '@fchc8/vite-plugin-multi-page';
 
 const config: ConfigFunction = context => {
   return {
@@ -247,7 +247,7 @@ export default config;
 ### Utility functions
 
 ```typescript
-import { defineConfig, defineConfigTransform } from 'vite-plugin-multi-page';
+import { defineConfig, defineConfigTransform } from '@fchc8/vite-plugin-multi-page';
 
 // Define configuration
 export default defineConfig(context => ({

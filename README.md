@@ -1,4 +1,4 @@
-# vite-plugin-multi-page
+# @fchc8/vite-plugin-multi-page
 
 > English Documentation | [English Documentation](./README-EN.md)
 
@@ -105,7 +105,7 @@ export default context => {
 
 ```typescript
 import { defineConfig } from 'vite';
-import viteMultiPage from 'vite-plugin-multi-page';
+import { viteMultiPage } from '@fchc8/vite-plugin-multi-page';
 
 export default defineConfig({
   plugins: [viteMultiPage()],
@@ -218,7 +218,7 @@ npm run dev -- --strategy mobile
 
 ```typescript
 // multipage.config.ts
-import type { ConfigFunction } from 'vite-plugin-multi-page';
+import type { ConfigFunction } from '@fchc8/vite-plugin-multi-page';
 
 const config: ConfigFunction = context => {
   return {
@@ -247,7 +247,7 @@ export default config;
 ### 工具函数
 
 ```typescript
-import { defineConfig, defineConfigTransform } from 'vite-plugin-multi-page';
+import { defineConfig, defineConfigTransform } from '@fchc8/vite-plugin-multi-page';
 
 // 定义配置
 export default defineConfig(context => ({

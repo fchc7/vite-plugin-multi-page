@@ -43,6 +43,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,js,json}\"",
     "test": "echo 'No tests yet'",
     "test:cli": "node scripts/test-cli.js",
+    "verify:exports": "node scripts/verify-exports.js",
     "clean": "rm -rf dist",
     "example:dev": "cd example && pnpm run dev",
     "example:build": "cd example && pnpm run build",
