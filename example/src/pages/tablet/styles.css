@@ -1,0 +1,39 @@
+/* 平板端样式 - 测试 px-to-viewport 转换 */
+.tablet-container {
+  width: 800px; /* 应该转换为 78.125vw (800/1024*100) */
+  height: 400px; /* 应该转换为 52.08333vw (400/768*100) */
+  padding: 40px; /* 应该转换为 3.90625vw */
+  margin: 30px; /* 应该转换为 2.92969vw */
+  border-radius: 12px; /* 应该转换为 1.17188vw */
+  font-size: 18px; /* 应该转换为 1.75781vw */
+  background-color: #a8e6cf;
+}
+
+.tablet-sidebar {
+  width: 250px; /* 应该转换为 24.41406vw */
+  height: 600px; /* 应该转换为 78.125vw */
+  padding: 20px; /* 应该转换为 1.95313vw */
+  background-color: #ffd93d;
+}
+
+.tablet-content {
+  width: 550px; /* 应该转换为 53.71094vw */
+  padding: 25px; /* 应该转换为 2.44141vw */
+  font-size: 16px; /* 应该转换为 1.5625vw */
+  line-height: 28px; /* 应该转换为 2.73438vw */
+  background-color: #ff8a80;
+}
+
+.tablet-button {
+  width: 150px; /* 应该转换为 14.64844vw */
+  height: 50px; /* 应该转换为 4.88281vw */
+  font-size: 14px; /* 应该转换为 1.36719vw */
+  border-radius: 25px; /* 应该转换为 2.44141vw */
+  background-color: #6c5ce7;
+}
+
+/* 忽略转换的类 */
+.ignore {
+  width: 200px; /* 不应该转换 */
+  height: 100px; /* 不应该转换 */
+}

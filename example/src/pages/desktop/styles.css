@@ -1,0 +1,40 @@
+/* 桌面端样式 - 不使用postcss处理，保持原始px值 */
+.desktop-container {
+  width: 1200px; /* 应该保持为 1200px */
+  height: 800px; /* 应该保持为 800px */
+  padding: 50px; /* 应该保持为 50px */
+  margin: 40px; /* 应该保持为 40px */
+  border-radius: 16px; /* 应该保持为 16px */
+  font-size: 20px; /* 应该保持为 20px */
+  background-color: #74b9ff;
+}
+
+.desktop-sidebar {
+  width: 300px; /* 应该保持为 300px */
+  height: 700px; /* 应该保持为 700px */
+  padding: 30px; /* 应该保持为 30px */
+  background-color: #fd79a8;
+}
+
+.desktop-content {
+  width: 900px; /* 应该保持为 900px */
+  padding: 35px; /* 应该保持为 35px */
+  font-size: 18px; /* 应该保持为 18px */
+  line-height: 32px; /* 应该保持为 32px */
+  background-color: #fdcb6e;
+}
+
+.desktop-button {
+  width: 200px; /* 应该保持为 200px */
+  height: 60px; /* 应该保持为 60px */
+  font-size: 16px; /* 应该保持为 16px */
+  border-radius: 30px; /* 应该保持为 30px */
+  background-color: #00b894;
+}
+
+.desktop-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 250px); /* 应该保持为 250px */
+  gap: 20px; /* 应该保持为 20px */
+  padding: 25px; /* 应该保持为 25px */
+}

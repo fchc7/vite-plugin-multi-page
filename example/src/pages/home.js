@@ -2,9 +2,7 @@
 document.addEventListener('DOMContentLoaded', function () {
   // 检查环境变量
   console.log('环境变量检查:');
-  console.log('__MODE__:', __MODE__);
-  console.log('__THEME__:', __THEME__);
-  console.log('__VERSION__:', __VERSION__);
+  console.log('__MODE__:', PAGE_NAME);
 
   // 创建环境变量显示元素
   const envDisplay = document.createElement('div');
@@ -19,8 +17,6 @@ document.addEventListener('DOMContentLoaded', function () {
   envDisplay.innerHTML = `
     <div style="margin-bottom:8px"><strong>环境变量:</strong></div>
     <div>MODE: ${__MODE__}</div>
-    <div>THEME: ${__THEME__}</div>
-    <div>VERSION: ${__VERSION__}</div>
   `;
   document.body.appendChild(envDisplay);
 
@@ -50,7 +46,11 @@ document.addEventListener('DOMContentLoaded', function () {
       
       <div>
         <strong>生成的类名:</strong>
-        <pre style="background:#f0f0f0;padding:5px;margin-top:5px;overflow:auto;font-size:12px;">${JSON.stringify(styles, null, 2)}</pre>
+        <pre style="background:#f0f0f0;padding:5px;margin-top:5px;overflow:auto;font-size:12px;">${JSON.stringify(
+          styles,
+          null,
+          2
+        )}</pre>
       </div>
     `;
       document.body.appendChild(cssTestElement);

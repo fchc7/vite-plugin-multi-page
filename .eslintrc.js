@@ -18,15 +18,27 @@ module.exports = {
     es6: true,
   },
   rules: {
-    'prettier/prettier': 'error',
+    'prettier/prettier': [
+      'error',
+      {
+        semi: true,
+        trailingComma: 'es5',
+        singleQuote: true,
+        printWidth: 100,
+        tabWidth: 2,
+        useTabs: false,
+        bracketSpacing: true,
+        arrowParens: 'avoid',
+        endOfLine: 'lf',
+      },
+    ],
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-non-null-assertion': 'warn',
     'prefer-const': 'error',
     'no-var': 'error',
-    '@typescript-eslint/no-explicit-any': 'off', // 允许显式 any
   },
   ignorePatterns: ['dist/', 'node_modules/', '*.js', 'example/'],
   overrides: [

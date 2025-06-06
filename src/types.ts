@@ -1,54 +1,128 @@
 import type { UserConfig } from 'vite';
 
+// 核心配置选项
 export interface MultiPageOptions {
   entry?: string;
-  template?: string;
   exclude?: string[];
+  template?: string;
   placeholder?: string;
   debug?: boolean;
-  configStrategies?: Record<string, ConfigStrategy>;
+  strategies?: Record<string, ConfigStrategy>;
   pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
+  __forceBuildStrategy?: string;
 }
 
+// 主要导出类型
+export type Options = MultiPageOptions;
+
+// 开发服务器选项
 export interface DevServerOptions {
   entry: string;
   exclude: string[];
   template: string;
   placeholder: string;
-  configStrategies?: Record<string, ConfigStrategy>;
+  strategies?: Record<string, ConfigStrategy>;
   pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
   appliedStrategies?: Map<string, string>;
 }
 
-export interface ConfigStrategy extends Omit<UserConfig, 'plugins'> {
-  // 移除output属性，完全使用Vite标准配置结构
+// 构建配置选项
+export interface BuildConfigOptions {
+  entry: string;
+  exclude: string[];
+  template: string;
+  placeholder: string;
+  strategies?: Record<string, ConfigStrategy>;
+  pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
+  forceBuildStrategy?: string;
 }
 
-export interface PageConfigBase {
-  // 保留核心属性
-  strategy?: string; // 指定使用哪个配置策略
-  template?: string; // 指定使用的HTML模板
-  define?: Record<string, any>; // 页面级环境变量
-  match?: string | string[]; // 用于模式匹配
+// 策略配置
+export interface ConfigStrategy extends Omit<UserConfig, 'plugins'> {}
+
+// 页面配置
+export interface PageConfig {
+  strategy?: string;
+  define?: Record<string, any>;
+  template?: string;
+  viteConfig?: UserConfig;
+  match?: string;
 }
 
-export interface PageConfig extends PageConfigBase {}
-
-export interface PageConfigContext {
+// 页面上下文
+export interface PageContext {
   pageName: string;
   filePath: string;
   relativePath: string;
+  fullPath?: string;
   strategy?: string;
   isMatched?: boolean;
 }
 
-export type PageConfigFunction = (context: PageConfigContext) => PageConfig | null;
+// 页面配置上下文（别名）
+export type PageConfigContext = PageContext;
 
+// 页面配置函数
+export type PageConfigFunction = (context: PageContext) => PageConfig | null;
+
+// 入口文件信息
 export interface EntryFile {
   name: string;
   file: string;
 }
 
+// 候选文件信息
 export interface CandidateFile extends EntryFile {
   priority: number;
+}
+
+// 构建策略配置
+export interface BuildStrategyConfig {
+  strategy: string;
+  pages: string[];
+  configPath?: string;
+}
+
+// CLI选项
+export interface CLIOptions {
+  configFile: string;
+  outDir?: string;
+  debug?: boolean;
+  mode?: string;
+  minify?: boolean | string;
+  build?: Record<string, any>;
+  base?: string;
+  strategy?: string;
+  port?: number | string;
+  host?: string;
+  https?: boolean;
+  open?: boolean;
+}
+
+// 插件上下文
+export interface PluginContext {
+  mode: string;
+  command: 'build' | 'serve';
+  isCLI: boolean;
+}
+
+// 配置函数类型
+export type ConfigFunction = (context: PluginContext) => MultiPageOptions;
+
+// 配置变换函数类型
+export type ConfigTransformFunction = (
+  config: MultiPageOptions,
+  context: PluginContext
+) => MultiPageOptions;
+
+// 工具函数：定义配置
+export function defineConfig(
+  config: MultiPageOptions | ConfigFunction
+): MultiPageOptions | ConfigFunction {
+  return config;
+}
+
+// 工具函数：定义配置变换
+export function defineConfigTransform(transform: ConfigTransformFunction): ConfigTransformFunction {
+  return transform;
 }

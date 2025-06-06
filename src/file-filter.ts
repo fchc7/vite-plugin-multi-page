@@ -8,9 +8,14 @@ export function filterEntryFiles(
   log: (...args: any[]) => void
 ): EntryFile[] {
   const result: EntryFile[] = [];
-  const nameToFile = new Map<string, string>();
+  const nameToFile = new Map<string, { file: string; priority: number }>();
 
-  const basePattern = entry.replace(/\/\*\*.*$/, '');
+  // 从entry模式中提取基础目录
+  let basePattern = entry.replace(/\/\*.*$/, ''); // 去掉glob部分
+  // 如果基础模式为空或不合理，使用默认处理
+  if (!basePattern || basePattern === entry) {
+    basePattern = path.dirname(entry.split('*')[0]);
+  }
   log('基础目录模式:', basePattern);
 
   const candidateFiles: CandidateFile[] = [];
@@ -29,15 +34,18 @@ export function filterEntryFiles(
     log(`路径部分: ${pathParts}`);
 
     if (pathParts.length === 1) {
+      // 第一级文件：src/pages/about.js -> /about.html
       const fileName = pathParts[0];
       const name = path.basename(fileName, path.extname(fileName));
       candidateFiles.push({ name, file, priority: 1 });
       log(`📄 第一级文件: ${file} -> ${name}.html (优先级: 1)`);
     } else if (pathParts.length >= 2) {
+      // 目录下的文件
       const fileName = path.basename(file, path.extname(file));
       const dirName = pathParts[0];
 
       if (fileName === 'main') {
+        // 目录下的main文件：src/pages/mobile/main.ts -> /mobile.html
         candidateFiles.push({ name: dirName, file, priority: 2 });
         log(`📁 目录main文件: ${file} -> ${dirName}.html (优先级: 2)`);
       } else {
@@ -48,24 +56,26 @@ export function filterEntryFiles(
     }
   }
 
+  // 按照优先级处理冲突：目录优先覆盖文件（优先级2 > 优先级1）
   for (const candidate of candidateFiles) {
     const existing = nameToFile.get(candidate.name);
 
     if (!existing) {
-      nameToFile.set(candidate.name, candidate.file);
+      nameToFile.set(candidate.name, { file: candidate.file, priority: candidate.priority });
       log(`✅ 添加页面: ${candidate.name} -> ${candidate.file}`);
     } else {
-      const existingCandidate = candidateFiles.find(c => c.file === existing);
-      if (existingCandidate && candidate.priority > existingCandidate.priority) {
-        nameToFile.set(candidate.name, candidate.file);
-        log(`🔄 替换页面: ${candidate.name} -> ${candidate.file} (替换 ${existing})`);
+      if (candidate.priority > existing.priority) {
+        nameToFile.set(candidate.name, { file: candidate.file, priority: candidate.priority });
+        log(
+          `🔄 替换页面: ${candidate.name} -> ${candidate.file} (替换 ${existing.file}, 目录优先)`
+        );
       } else {
-        log(`⚠️ 冲突跳过: ${candidate.name} -> ${candidate.file} (保留 ${existing})`);
+        log(`⚠️ 冲突跳过: ${candidate.name} -> ${candidate.file} (保留 ${existing.file})`);
       }
     }
   }
 
-  for (const [name, file] of nameToFile.entries()) {
+  for (const [name, { file }] of nameToFile.entries()) {
     result.push({ name, file });
   }
 

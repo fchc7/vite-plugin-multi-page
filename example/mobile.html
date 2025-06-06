@@ -6,42 +6,39 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
+    <title>移动端页面</title>
     <meta name="format-detection" content="telephone=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#667eea" />
-
-    <title>移动端应用 - 多页面演示</title>
-
     <style>
-      /* 关键 CSS 内联避免 FOUC */
-      html {
-        font-size: 37.5px;
-        -webkit-text-size-adjust: 100%;
+      /* 移动端专用样式 */
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
       }
       body {
         margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial,
+          sans-serif;
+        line-height: 1.4;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      }
-      #app {
         min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        text-align: center;
       }
-      .loading {
-        font-size: 18px;
+      .mobile-header {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 1rem;
+        text-align: center;
+        color: white;
+        font-size: 1.2rem;
+        font-weight: bold;
       }
     </style>
   </head>
   <body>
-    <div id="app">
-      <div class="loading">📱 加载中...</div>
-    </div>
-
+    <div class="mobile-header">📱 移动端多页面应用</div>
+    <div id="app"></div>
     <script type="module" src="{{ENTRY_FILE}}"></script>
   </body>
 </html>

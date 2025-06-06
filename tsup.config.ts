@@ -1,16 +1,34 @@
-import { defineConfig } from "tsup";
+import { defineConfig } from 'tsup';
 
-export default defineConfig({
-  entry: ["src/index.ts"],
-  format: ["cjs", "esm"],
-  target: "node16",
-  splitting: false,
-  sourcemap: true,
-  clean: true,
-  dts: true,
-  external: ["vite", "glob"],
-  cjsInterop: true,
-  banner: {
-    js: '// @ts-nocheck',
+export default defineConfig([
+  // 主库配置
+  {
+    entry: ['src/index.ts'],
+    format: ['cjs', 'esm'],
+    dts: true,
+    sourcemap: true,
+    clean: true,
+    target: 'node16',
+    shims: true,
+    external: ['vite', 'glob'],
+    cjsInterop: true,
+    esbuildOptions(options) {
+      options.legalComments = 'none';
+    },
   },
-});
+  // CLI配置
+  {
+    entry: ['src/cli.ts'],
+    format: ['cjs'],
+    target: 'node16',
+    shims: true,
+    external: ['vite', 'glob'],
+    cjsInterop: true,
+    esbuildOptions(options) {
+      options.legalComments = 'none';
+      options.banner = {
+        js: '#!/usr/bin/env node',
+      };
+    },
+  },
+]);

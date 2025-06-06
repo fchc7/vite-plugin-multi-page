@@ -1,19 +1,43 @@
+/* CSS Module 测试样式 */
 .testBox {
-  padding: 10px;
+  padding: 15px;
   margin: 10px 0;
-  border-radius: 4px;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+  background: #f9f9f9;
+  transition: all 0.3s ease;
+}
+
+.testBox:hover {
+  border-color: #007bff;
+  background: #f0f8ff;
 }
 
 .mobileStyle {
-  background-color: #e6f7ff;
-  color: #1890ff;
-  border-color: #91d5ff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: #667eea;
 }
 
 .pcStyle {
-  background-color: #f6ffed;
-  color: #52c41a;
-  border-color: #b7eb8f;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border-color: #f093fb;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .testBox {
+    padding: 10px;
+    margin: 8px 0;
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 769px) {
+  .testBox {
+    padding: 20px;
+    margin: 15px 0;
+    font-size: 16px;
+  }
 }

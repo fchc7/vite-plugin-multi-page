@@ -1,0 +1,31 @@
+/* 移动端样式 - 测试 pxtorem 转换 */
+.mobile-container {
+  width: 375px; /* 应该转换为 10rem (375/37.5) */
+  height: 200px; /* 应该转换为 5.33333rem */
+  padding: 20px; /* 应该转换为 0.53333rem */
+  margin: 15px; /* 应该转换为 0.4rem */
+  border-radius: 8px; /* 应该转换为 0.21333rem */
+  font-size: 16px; /* 应该转换为 0.42667rem */
+  background-color: #ff6b6b;
+}
+
+.mobile-button {
+  width: 120px; /* 应该转换为 3.2rem */
+  height: 44px; /* 应该转换为 1.17333rem */
+  padding: 10px 15px; /* 应该转换为 0.26667rem 0.4rem */
+  font-size: 14px; /* 应该转换为 0.37333rem */
+  border-radius: 22px; /* 应该转换为 0.58667rem */
+  background-color: #4ecdc4;
+  border: 1px solid #45b7aa; /* 小于2px，不应该转换 */
+}
+
+.mobile-text {
+  line-height: 24px; /* 应该转换为 0.64rem */
+  letter-spacing: 1px; /* 小于2px，不应该转换 */
+}
+
+/* 忽略转换的类 */
+.ignore {
+  width: 100px; /* 不应该转换 */
+  height: 50px; /* 不应该转换 */
+}
