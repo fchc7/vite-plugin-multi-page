@@ -1,5 +1,7 @@
 # vite-plugin-multi-page
 
+> English Documentation | [English Documentation](./README-EN.md)
+
 一个强大的 Vite 插件，支持多页面应用开发，提供多策略构建、TypeScript 配置支持和命令行工具。
 
 ## 特性
@@ -185,13 +187,13 @@ pageConfigs: context => {
 
 ```bash
 # 构建所有策略
-npx vite-multi-page-build
+npx vite-mp
 
 # 传递额外的 Vite 参数
-npx vite-multi-page-build --host --port 3000
+npx vite-mp --host --port 3000
 
 # 启用调试模式
-npx vite-multi-page-build --debug
+npx vite-mp --debug
 ```
 
 ### 开发服务器

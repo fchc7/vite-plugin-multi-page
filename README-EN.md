@@ -1,336 +1,270 @@
 # vite-plugin-multi-page
 
-> English Documentation | [中文文档](./README.md)
+> 中文文档 | [中文文档](./README.md)
 
-A powerful Vite plugin for building multi-page applications with smart file routing and multiple build strategies.
+A powerful Vite plugin for building multi-page applications with smart file routing and multi-strategy builds.
 
-## ✨ Features
+## Features
 
-- 🚀 **Automatic Page Discovery**: Automatically scan and configure entry pages based on file patterns
-- 🎯 **Multiple Build Strategies**: Configure different build options and optimization strategies for different pages
-- 🧩 **Flexible Configuration**: Support object configuration, function configuration, and pattern matching
-- 📱 **Responsive Templates**: Different pages can use different HTML templates
-- 🔧 **Full Vite Integration**: Inherit all Vite configuration options
-- 🌍 **Environment Variables Support**: Page-level and strategy-level environment variable definitions
-- 🎨 **Developer Friendly**: Detailed debug logs and hot reload support
+- 🎯 **Multi-page support**: Automatically discover page entry files
+- 🔧 **Multi-strategy builds**: Support configuring different build strategies for different pages
+- 📝 **TypeScript configuration**: Support TypeScript configuration files
+- 🚀 **CLI tool**: Provide a command-line batch build tool
+- 🔄 **Hot reload**: Development server supports page hot reload
+- 📦 **Smart merge**: Automatically merge multi-strategy build results
 
-## 📦 Installation
+## Installation
 
 ```bash
-npm install @fchc8/vite-plugin-multi-page
-# or
-yarn add @fchc8/vite-plugin-multi-page
-# or
-pnpm add @fchc8/vite-plugin-multi-page
+npm install vite-plugin-multi-page --save-dev
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### Basic Usage
+### 1. Create a configuration file
+
+Create a `multipage.config.ts` or `multipage.config.js`:
 
 ```typescript
-// vite.config.ts
-import { defineConfig } from 'vite';
-import viteMultiPage from '@fchc8/vite-plugin-multi-page';
+export default context => {
+  const { mode, command, isCLI } = context;
+  const isProduction = mode === 'production';
 
-export default defineConfig({
-  plugins: [
-    viteMultiPage({
-      entry: 'src/pages/**/*.{ts,js}',
-      template: 'index.html',
-      exclude: ['src/main.ts'],
-      debug: true,
-    }),
-  ],
-});
-```
+  return {
+    // Page entry matching rule
+    entry: 'src/pages/**/*.{ts,js}',
 
-### Project Structure Example
+    // HTML template
+    template: 'index.html',
 
-```
-project/
-├── src/
-│   └── pages/
-│       ├── home.ts          → /home.html
-│       ├── about.ts         → /about.html
-│       ├── admin/
-│       │   └── dashboard.ts → /dashboard.html
-│       └── mobile/
-│           └── app.js       → /app.html
-├── index.html
-├── admin.html
-└── mobile.html
-```
+    // Template placeholder
+    placeholder: '{{ENTRY_FILE}}',
 
-## 🎯 Advanced Configuration
+    // Excluded files
+    exclude: ['src/shared/**/*.ts'],
 
-### Advanced Configuration
+    // Debug mode
+    debug: !isProduction || isCLI,
 
-```typescript
-import { defineConfig } from 'vite';
-import viteMultiPage from '@fchc8/vite-plugin-multi-page';
-
-export default defineConfig({
-  plugins: [
-    viteMultiPage({
-      entry: 'src/pages/**/*.{ts,js}',
-      template: 'index.html',
-
-      // Define configuration strategies
-      configStrategies: {
-        // Modern browser strategy
-        default: {
-          define: {
-            'process.env.BUILD_TYPE': '"modern"',
-          },
-          build: {
-            target: 'es2015',
-            minify: 'esbuild',
-            sourcemap: true,
-            rollupOptions: {
-              output: {
-                format: 'es',
-                entryFileNames: 'assets/[name]-[hash].js',
-              },
-            },
-          },
+    // Build strategy
+    strategies: {
+      default: {
+        define: {
+          IS_DEFAULT: true,
+          API_BASE: isProduction ? '"https://api.example.com"' : '"http://localhost:3001/api"',
         },
-
-        // Legacy browser compatibility
-        legacy: {
-          define: {
-            'process.env.BUILD_TYPE': '"legacy"',
-          },
-          build: {
-            target: 'es5',
-            minify: 'terser',
-            sourcemap: false,
-            rollupOptions: {
-              output: {
-                format: 'iife',
-                entryFileNames: 'legacy/[name].js',
-              },
-            },
-          },
-        },
-
-        // Mobile optimization
-        mobile: {
-          define: {
-            __MOBILE__: 'true',
-            __THEME__: '"dark"',
-          },
-          css: {
-            devSourcemap: true,
-          },
-          optimizeDeps: {
-            include: ['mobile-utils'],
-          },
+        build: {
+          sourcemap: !isProduction,
+          minify: isProduction ? 'esbuild' : false,
         },
       },
 
-      // Page-specific configurations
-      pageConfigs: {
-        // Using match patterns
-        'admin-pages': {
-          match: ['admin*', '**/admin/**'],
-          strategy: 'default',
-          template: 'admin.html',
+      mobile: {
+        define: {
+          IS_MOBILE: true,
+          API_BASE: isProduction
+            ? '"https://mobile-api.example.com"'
+            : '"http://localhost:3001/mobile-api"',
         },
+        build: {
+          target: ['es2015', 'chrome58', 'safari11'],
+          minify: isProduction ? 'terser' : false,
+        },
+      },
+    },
 
-        // Mobile pages
-        'mobile-app': {
-          match: '**/mobile/**',
+    // Page configuration function
+    pageConfigs: context => {
+      // Determine the application strategy based on the file path
+      if (context.relativePath.includes('/mobile/')) {
+        return {
           strategy: 'mobile',
-          template: 'mobile.html',
           define: {
-            __PAGE_TYPE__: '"app"',
+            PAGE_NAME: context.pageName,
+            MOBILE_PAGE: true,
           },
+        };
+      }
+
+      // Default strategy
+      return {
+        strategy: 'default',
+        define: {
+          PAGE_NAME: context.pageName,
+          DEFAULT_PAGE: true,
         },
-      },
-    }),
-  ],
+      };
+    },
+  };
+};
+```
+
+### 2. Configure Vite
+
+Add the plugin in `vite.config.ts`:
+
+```typescript
+import { defineConfig } from 'vite';
+import viteMultiPage from 'vite-plugin-multi-page';
+
+export default defineConfig({
+  plugins: [viteMultiPage()],
 });
 ```
 
-## 📋 Configuration Options
+### 3. Create page files
 
-### MultiPageOptions
+Create page files according to the convention:
 
-| Option            | Type                                               | Default                                | Description                 |
-| ----------------- | -------------------------------------------------- | -------------------------------------- | --------------------------- |
-| `entry`           | `string`                                           | `"src/**/*.{ts,js}"`                   | Entry file matching pattern |
-| `template`        | `string`                                           | `"index.html"`                         | Default HTML template       |
-| `exclude`         | `string[]`                                         | `["src/main.ts", "src/vite-env.d.ts"]` | Files to exclude            |
-| `placeholder`     | `string`                                           | `"{{ENTRY_FILE}}"`                     | Placeholder in template     |
-| `debug`           | `boolean`                                          | `false`                                | Enable debug logs           |
-| `buildStrategies` | `Record<string, BuildStrategy>`                    | `{}`                                   | Build strategy definitions  |
-| `pageConfigs`     | `Record<string, PageConfig> \| PageConfigFunction` | `{}`                                   | Page configurations         |
-
-### BuildStrategy
-
-```typescript
-// Configuration Strategy - Simplified, directly extends Vite config
-interface ConfigStrategy extends Omit<UserConfig, 'plugins'> {
-  // Uses Vite's standard configuration structure
-  // For example:
-  // - define: Environment variables
-  // - build: Build configuration
-  // - css: CSS configuration
-  // - server: Server configuration
-  // - optimizeDeps: Dependency optimization
-  // etc...
-}
+```
+src/pages/
+├── home.js                    # → /home.html
+├── about.js                   # → /about.html
+├── mobile/
+│   └── main.ts               # → /mobile.html (mobile strategy)
+└── admin/
+    └── main.ts               # → /admin.html
 ```
 
-> **Note**: The configuration strategy interface has been simplified to directly extend Vite's `UserConfig`. This allows you to use Vite's standard configuration structure without additional nesting. The functionality of the previous `output` property can now be achieved using `build.rollupOptions.output`.
+## Page discovery rules
 
-### PageConfig
+The plugin discovers page entries according to the following rules:
 
-```typescript
-interface PageConfig {
-  strategy?: string; // Specifies which configuration strategy to use
-  template?: string; // Specifies which HTML template to use
-  define?: Record<string, any>; // Page-level environment variables
-  match?: string | string[]; // Used for pattern matching
-}
-```
+1. **First-level files** (priority 1): `src/pages/home.js` → `/home.html`
+2. **Directory main files** (priority 2): `src/pages/mobile/main.ts` → `/mobile.html`
 
-> **Note**: The PageConfig interface has been simplified to only include core properties that are actually used. Unused properties like `exclude`, `alias`, and `build` have been removed, making the interface cleaner and more focused.
+**Directory priority rule**: If both `src/pages/about.js` and `src/pages/about/main.ts` exist, `src/pages/about/main.ts` will be used.
 
-## 🌟 Use Cases
+## Build strategies
 
-### 1. Enterprise Multi-Page Application
+### Strategy configuration
+
+策略配置支持所有 Vite 配置选项:
 
 ```typescript
-configStrategies: {
-  admin: {
-    define: { 'process.env.APP_TYPE': '"admin"' },
-    build: {
-      target: 'es2015',
-      sourcemap: true
-    }
-  },
-
-  public: {
-    define: { 'process.env.APP_TYPE': '"public"' },
-    build: {
-      target: 'es5',
-      minify: 'terser'
-    }
-  }
-}
-```
-
-### 2. Mobile Optimization
-
-```typescript
-configStrategies: {
+strategies: {
   mobile: {
-    css: { devSourcemap: true },
-    optimizeDeps: { include: ['@mobile/utils'] },
+    define: {
+      IS_MOBILE: true,
+    },
     build: {
-      target: 'es2018',
-      chunkSizeWarningLimit: 300,
-      cssCodeSplit: true
-    }
-  }
+      target: ['es2015'],
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: true,
+        },
+      },
+    },
+    // Other Vite configurations...
+  },
 }
 ```
 
-### 3. Component Library Development
+### Page strategy assignment
+
+Assign strategies to pages through the `pageConfigs` function:
 
 ```typescript
-configStrategies: {
-  library: {
-    build: {
-      lib: {
-        entry: 'src/index.ts',
-        name: 'MyLibrary',
-        formats: ['es', 'umd']
-      },
-      minify: false,
-      sourcemap: true
-    }
+pageConfigs: context => {
+  const { pageName, relativePath } = context;
+
+  if (relativePath.includes('/mobile/')) {
+    return { strategy: 'mobile' };
   }
-}
+
+  if (pageName.startsWith('admin')) {
+    return { strategy: 'admin' };
+  }
+
+  return { strategy: 'default' };
+};
 ```
 
-## 📱 Example Project
+## 命令行工具
 
-Check the `example/` directory for a complete example project including:
-
-- Admin dashboard (modern syntax)
-- Mobile application (compatible syntax)
-- Component library documentation
-- Different HTML templates
-- Function configuration examples
-
-### Quick Start
+### 批量构建
 
 ```bash
-# Method 1: Use setup script (recommended)
-./setup-example.sh
+# Build all strategies
+npx vite-mp
 
-# Method 2: Manual setup
-npm run build          # Build the plugin first
-cd example
-npm install            # Install example dependencies
-npm run dev            # Run development server
+# Pass additional Vite parameters
+npx vite-mp --host --port 3000
 
-# Method 3: Use root scripts
-npm run example:dev     # Development mode
-npm run example:build   # Build
-npm run example:preview # Preview build results
+# Enable debug mode
+npx vite-mp --debug
 ```
 
-### Example Pages
-
-After building, visit these pages:
-
-- `/home.html` - Home page (default strategy)
-- `/about.html` - About page (default strategy)
-- `/dashboard.html` - Admin dashboard (modern ES syntax + dedicated template)
-- `/app.html` - Mobile app (ES5 compatible syntax + mobile template)
-- `/index.html` - Component library docs (library mode + docs template)
-
-## 🔧 Development
+### 开发服务器
 
 ```bash
-# Clone the project
-git clone https://github.com/fchc7/vite-plugin-multi-page.git
-cd vite-plugin-multi-page
+# Start development server (all pages)
+npm run dev
 
-# Install dependencies
-pnpm install
-
-# Development mode
-pnpm dev
-
-# Type checking
-pnpm type-check
-
-# Code formatting
-pnpm format
-
-# Code linting
-pnpm lint
-
-# Build
-pnpm build
+# Only display pages with specific strategies
+npm run dev -- --strategy mobile
 ```
 
-## 🤝 Contributing
+## Environment variables
 
-Issues and Pull Requests are welcome!
+- `VITE_BUILD_STRATEGY`: Specify a single strategy build
+- `IS_MOBILE`: Mobile identifier (configured in define)
+- `API_BASE`: API base address (configured in define)
 
-## 📄 License
+## TypeScript support
+
+The plugin fully supports TypeScript configuration files:
+
+```typescript
+// multipage.config.ts
+import type { ConfigFunction } from 'vite-plugin-multi-page';
+
+const config: ConfigFunction = context => {
+  return {
+    entry: 'src/pages/**/*.{ts,js}',
+    // ... other configurations
+  };
+};
+
+export default config;
+```
+
+## API reference
+
+### Configuration options
+
+| Option        | Type                       | Default                    | Description                  |
+| ------------- | -------------------------- | -------------------------- | ---------------------------- |
+| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | Page entry matching rule     |
+| `template`    | `string`                   | `'index.html'`             | HTML template file           |
+| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | Template placeholder         |
+| `exclude`     | `string[]`                 | `[]`                       | Excluded file patterns       |
+| `debug`       | `boolean`                  | `false`                    | Enable debug log             |
+| `strategies`  | `Record<string, Strategy>` | `{}`                       | Build strategy configuration |
+| `pageConfigs` | `Function \| Object`       | `{}`                       | Page                         |
+
+### Utility functions
+
+```typescript
+import { defineConfig, defineConfigTransform } from 'vite-plugin-multi-page';
+
+// Define configuration
+export default defineConfig(context => ({
+  // Configuration options
+}));
+
+// Configuration transformation
+const transform = defineConfigTransform((config, context) => {
+  // Modify configuration
+  return config;
+});
+```
+
+## Example project
+
+See [example](./example) directory for a complete example project.
+
+## License
 
 MIT License
-
-## 🔗 Related Links
-
-- [Vite Official Documentation](https://vitejs.dev/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [ESLint](https://eslint.org/)
-- [Prettier](https://prettier.io/)
