@@ -15,21 +15,25 @@ interface BuildResult {
 /**
  * 解析命令行参数
  */
-function parseArgs(): { viteBuildArgs: string[]; debug: boolean } {
+function parseArgs(): { viteBuildArgs: string[]; debug: boolean; cwd?: string } {
   const args = process.argv.slice(2);
   const viteBuildArgs: string[] = [];
   let debug = false;
+  let cwd: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--debug') {
       debug = true;
+    } else if (arg === '--cwd') {
+      cwd = args[++i]; // 获取下一个参数作为目录
     } else if (arg === '--help' || arg === '-h') {
       console.log(`
 使用方法: vite-multi-page-build [选项]
 
 选项:
   --debug          启用调试模式
+  --cwd <dir>      指定工作目录
   --help, -h       显示帮助信息
   
 其他所有参数将传递给 vite build 命令
@@ -37,16 +41,18 @@ function parseArgs(): { viteBuildArgs: string[]; debug: boolean } {
 示例:
   vite-multi-page-build
   vite-multi-page-build --debug
+  vite-multi-page-build --cwd example
   vite-multi-page-build --host --port 3000
   vite-multi-page-build --mode production --debug
 `);
       process.exit(0);
-    } else {
+    } else if (arg !== 'build') {
+      // 跳过 'build' 命令，因为我们会自动添加
       viteBuildArgs.push(arg);
     }
   }
 
-  return { viteBuildArgs, debug };
+  return { viteBuildArgs, debug, cwd };
 }
 
 /**
@@ -54,54 +60,25 @@ function parseArgs(): { viteBuildArgs: string[]; debug: boolean } {
  */
 async function loadViteConfig(): Promise<Options> {
   const { loadUserConfig, hasCustomConfig } = await import('./config-loader');
+  const { mergeWithDefaults } = await import('./defaults');
 
-  // 检查是否有用户配置文件
-  if (!hasCustomConfig()) {
-    console.error('❌ 未找到多页面配置文件！');
-    console.log('请创建以下配置文件之一：');
-    console.log('  - multipage.config.ts');
-    console.log('  - multipage.config.js');
-    console.log('  - multipage.config.mjs');
-    console.log('');
-    console.log('配置文件示例：');
-    console.log('');
-    console.log('```typescript');
-    console.log('export default (context) => {');
-    console.log('  const { mode, command, isCLI } = context;');
-    console.log('  const isProduction = mode === "production";');
-    console.log('  ');
-    console.log('  return {');
-    console.log('    entry: "src/pages/**/*.{ts,js}",');
-    console.log('    template: "index.html",');
-    console.log('    placeholder: "{{ENTRY_FILE}}",');
-    console.log('    strategies: {');
-    console.log('      default: {');
-    console.log('        define: { IS_DEFAULT: true },');
-    console.log('        build: { sourcemap: !isProduction },');
-    console.log('      },');
-    console.log('    },');
-    console.log('    pageConfigs: (pageContext) => ({');
-    console.log('      strategy: "default",');
-    console.log('    }),');
-    console.log('  };');
-    console.log('};');
-    console.log('```');
-    process.exit(1);
+  // 加载用户配置（如果存在）
+  let userConfig: Options | null = null;
+
+  if (hasCustomConfig()) {
+    userConfig = await loadUserConfig({
+      mode: 'production',
+      command: 'build',
+      isCLI: true,
+    });
+  } else {
+    console.log('ℹ️  未找到配置文件，使用默认配置');
   }
 
-  // 加载用户配置
-  const userConfig = await loadUserConfig({
-    mode: 'production',
-    command: 'build',
-    isCLI: true,
-  });
+  // 合并用户配置和默认配置
+  const finalConfig = mergeWithDefaults(userConfig);
 
-  if (!userConfig) {
-    console.error('❌ 配置文件加载失败！');
-    process.exit(1);
-  }
-
-  return userConfig;
+  return finalConfig;
 }
 
 /**
@@ -392,8 +369,19 @@ async function cleanup(strategies: string[], debug: boolean): Promise<void> {
  * 主函数
  */
 async function main(): Promise<void> {
-  const { viteBuildArgs, debug } = parseArgs();
+  const { viteBuildArgs, debug, cwd } = parseArgs();
   const log = debug ? console.log.bind(console, '[main]') : () => {};
+
+  // 如果指定了工作目录，切换到该目录
+  if (cwd) {
+    const targetDir = path.resolve(process.cwd(), cwd);
+    if (!fs.existsSync(targetDir)) {
+      console.error(`❌ 指定的目录不存在: ${targetDir}`);
+      process.exit(1);
+    }
+    process.chdir(targetDir);
+    log(`切换工作目录到: ${targetDir}`);
+  }
 
   try {
     log('🚀 开始多策略构建...');

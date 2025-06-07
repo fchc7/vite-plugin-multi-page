@@ -1,3 +1,5 @@
+import { ConfigFunction, defineConfig } from '../dist/index.d.mts';
+
 const config = context => {
   const { mode, command, isCLI } = context;
   const isProduction = mode === 'production';
@@ -103,16 +105,16 @@ const config = context => {
     // 页面配置函数
     pageConfigs: context => {
       // 根据文件路径判断应用的策略
-      // if (context.relativePath.includes('/mobile/')) {
-      //   return {
-      //     strategy: 'mobile',
-      //     define: {
-      //       PAGE_NAME: context.pageName,
-      //       MOBILE_PAGE: true,
-      //     },
-      //     template: context.pageName === 'mobile' ? 'mobile.html' : undefined,
-      //   };
-      // }
+      if (context.relativePath.includes('/mobile/')) {
+        return {
+          strategy: 'mobile',
+          define: {
+            PAGE_NAME: context.pageName,
+            MOBILE_PAGE: true,
+          },
+          template: context.pageName === 'mobile' ? 'mobile.html' : undefined,
+        };
+      }
 
       if (context.relativePath.includes('/tablet/')) {
         return {
@@ -136,4 +138,4 @@ const config = context => {
   };
 };
 
-export default config;
+export default defineConfig(config);

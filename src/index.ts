@@ -186,3 +186,4 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
 export default viteMultiPage;
 export type { Options } from './types';
 export { generateBuildConfig, getAvailableStrategies } from './build-config';
+export { mergeWithDefaults } from './defaults';
