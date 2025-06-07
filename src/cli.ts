@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as glob from 'glob';
 import type { Options } from './types';
+import { getViteOutputDirectory } from './build-config';
 
 interface BuildResult {
   strategy: string;
@@ -119,23 +120,24 @@ function buildStrategy(
 
     child.on('close', code => {
       const success = code === 0;
-      const outputDir = `dist/${strategy}`;
+
+      // 获取实际的输出目录
+      const actualOutputDir = getViteOutputDirectory(viteBuildArgs);
 
       if (success) {
         log(`✅ 策略 ${strategy} 构建成功`);
 
         // 重命名HTML文件：.temp.mp.[name].html -> [name].html
         try {
-          const outputPath = path.resolve(process.cwd(), outputDir);
-          if (fs.existsSync(outputPath)) {
-            const files = fs.readdirSync(outputPath);
+          if (fs.existsSync(actualOutputDir)) {
+            const files = fs.readdirSync(actualOutputDir);
             for (const file of files) {
               if (file.startsWith('.temp.mp.') && file.endsWith('.html')) {
-                const oldPath = path.resolve(outputPath, file);
+                const oldPath = path.resolve(actualOutputDir, file);
                 // 从 .temp.mp.[name].html 提取 [name]
                 const name = file.replace(/^\.temp\.mp\./, '').replace(/\.html$/, '');
                 const newName = `${name}.html`;
-                const newPath = path.resolve(outputPath, newName);
+                const newPath = path.resolve(actualOutputDir, newName);
                 fs.renameSync(oldPath, newPath);
                 log(`重命名HTML: ${file} -> ${newName}`);
               }
@@ -155,17 +157,18 @@ function buildStrategy(
         strategy,
         success,
         error: success ? undefined : errorOutput || `构建失败，退出码: ${code}`,
-        outputDir,
+        outputDir: actualOutputDir,
       });
     });
 
     child.on('error', error => {
       log(`❌ 策略 ${strategy} 构建出错:`, error.message);
+      const actualOutputDir = getViteOutputDirectory(viteBuildArgs);
       resolve({
         strategy,
         success: false,
         error: error.message,
-        outputDir: `dist/${strategy}`,
+        outputDir: actualOutputDir,
       });
     });
   });
