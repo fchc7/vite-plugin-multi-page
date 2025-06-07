@@ -37,7 +37,10 @@ module.exports.viteMultiPage = viteMultiPage;
 module.exports.defineConfig = defineConfig;
 module.exports.defineConfigTransform = defineConfigTransform;
 module.exports.generateBuildConfig = generateBuildConfig;
-module.exports.getAvailableStrategies = getAvailableStrategies;`
+module.exports.getAvailableStrategies = getAvailableStrategies;
+module.exports.getViteOutputDirectory = getViteOutputDirectory;
+module.exports.cleanViteOutputDirectory = cleanViteOutputDirectory;
+module.exports.mergeWithDefaults = mergeWithDefaults;`
         );
         fs.writeFileSync(cjsFile, content);
       }
@@ -46,7 +49,6 @@ module.exports.getAvailableStrategies = getAvailableStrategies;`
       const mtsFile = path.resolve('dist/index.d.mts');
       if (fs.existsSync(mtsFile)) {
         fs.unlinkSync(mtsFile);
-        console.log('已删除 index.d.mts 文件以避免兼容性问题');
       }
     },
   },

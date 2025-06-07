@@ -214,7 +214,7 @@ function generateStrategyConfig(
     htmlInputs[pageName] = tempHtmlPath;
   }
 
-  // 构建基础配置
+  // 构建基础配置 - 不设置 outDir，让 Vite 使用默认配置
   const baseConfig: UserConfig = {
     build: {
       rollupOptions: {
@@ -225,7 +225,6 @@ function generateStrategyConfig(
           assetFileNames: 'assets/[name]-[hash][extname]',
         },
       },
-      outDir: `dist/${strategyName}`, // 直接输出到策略目录
       emptyOutDir: false, // 不清空输出目录，避免删除临时HTML文件
     },
     define: {},
@@ -252,7 +251,6 @@ function generateStrategyConfig(
   if (!config.build.rollupOptions) config.build.rollupOptions = {};
 
   // 确保关键配置不被覆盖
-  config.build.outDir = `dist/${strategyName}`; // 强制设置正确的输出目录
   config.build.rollupOptions.input = htmlInputs; // 强制使用临时HTML文件作为输入
   config.build.emptyOutDir = false; // 不清空输出目录，避免删除临时HTML文件
 
@@ -260,6 +258,48 @@ function generateStrategyConfig(
   log(`策略 "${strategyName}" - ${pages.length} 个页面`);
 
   return config;
+}
+
+/**
+ * 获取Vite配置的输出目录
+ * 需要传入已解析的Vite配置或命令行参数
+ */
+export function getViteOutputDirectory(viteBuildArgs: string[] = []): string {
+  // 1. 首先检查命令行参数中的 --outDir
+  const outDirIndex = viteBuildArgs.findIndex(arg => arg === '--outDir');
+  if (outDirIndex !== -1 && outDirIndex + 1 < viteBuildArgs.length) {
+    const outDir = viteBuildArgs[outDirIndex + 1];
+    return path.resolve(process.cwd(), outDir);
+  }
+
+  // 2. 检查 --outDir=value 格式
+  const outDirArg = viteBuildArgs.find(arg => arg.startsWith('--outDir='));
+  if (outDirArg) {
+    const outDir = outDirArg.split('=')[1];
+    return path.resolve(process.cwd(), outDir);
+  }
+
+  // 3. 如果没有命令行参数，使用 Vite 默认值
+  // 注意：如果用户在 vite.config.ts 中配置了 build.outDir，
+  // Vite 会自动使用该配置，我们这里只处理命令行参数的情况
+  return path.resolve(process.cwd(), 'dist');
+}
+
+/**
+ * 清理Vite配置的输出目录
+ */
+export function cleanViteOutputDirectory(viteBuildArgs: string[] = []): void {
+  const outputDir = getViteOutputDirectory(viteBuildArgs);
+  const log = createLogger(true);
+
+  try {
+    if (fs.existsSync(outputDir)) {
+      fs.rmSync(outputDir, { recursive: true, force: true });
+      log(`🧹 清理输出目录: ${path.relative(process.cwd(), outputDir)}`);
+    }
+  } catch (error) {
+    log(`⚠️ 清理输出目录失败: ${outputDir}`, error);
+  }
 }
 
 /**
@@ -271,11 +311,15 @@ export function getAvailableStrategies(options: BuildConfigOptions): string[] {
   const log = createLogger(false); // 静默模式
   const strategySet = new Set<string>();
 
-  try {
-    // 发现所有页面入口文件
-    const allFiles = glob.sync(entry, { cwd: process.cwd() });
-    const entryFiles = filterEntryFiles(allFiles, entry, exclude, log);
+  // 发现所有页面入口文件
+  const allFiles = glob.sync(entry, { cwd: process.cwd() });
+  const entryFiles = filterEntryFiles(allFiles, entry, exclude, log);
 
+  if (entryFiles.length === 0) {
+    throw new Error(`未找到匹配的入口文件: ${entry}`);
+  }
+
+  try {
     // 分析每个页面的策略
     for (const entryFile of entryFiles) {
       const pageContext = {

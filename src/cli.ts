@@ -2,7 +2,6 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as glob from 'glob';
-import { getAvailableStrategies } from './build-config';
 import type { Options } from './types';
 
 interface BuildResult {
@@ -39,11 +38,10 @@ function parseArgs(): { viteBuildArgs: string[]; debug: boolean; cwd?: string } 
 其他所有参数将传递给 vite build 命令
 
 示例:
-  vite-multi-page-build
-  vite-multi-page-build --debug
-  vite-multi-page-build --cwd example
-  vite-multi-page-build --host --port 3000
-  vite-multi-page-build --mode production --debug
+  vite-mp
+  vite-mp --debug
+  vite-mp --cwd example
+  vite-mp --mode production --debug
 `);
       process.exit(0);
     } else if (arg !== 'build') {
@@ -395,6 +393,7 @@ async function main(): Promise<void> {
     // 1. 加载配置并获取所有策略
     log('📋 加载配置...');
     const options = await loadViteConfig();
+    const { getAvailableStrategies } = await import('./build-config');
     const strategies = getAvailableStrategies({
       entry: options.entry || 'src/pages/*/main.{ts,js}',
       exclude: options.exclude || [],
@@ -410,13 +409,18 @@ async function main(): Promise<void> {
 
     log(`发现 ${strategies.length} 个策略: ${strategies.join(', ')}`);
 
-    // 2. 并行构建所有策略
+    // 2. 清理输出目录
+    log('🧹 清理输出目录...');
+    const { cleanViteOutputDirectory } = await import('./build-config');
+    cleanViteOutputDirectory(viteBuildArgs);
+
+    // 3. 并行构建所有策略
     log('🔨 开始并行构建...');
     const buildPromises = strategies.map(strategy => buildStrategy(strategy, viteBuildArgs, debug));
 
     const results = await Promise.all(buildPromises);
 
-    // 3. 检查构建结果
+    // 4. 检查构建结果
     const successCount = results.filter(r => r.success).length;
     const failureCount = results.length - successCount;
 
@@ -437,11 +441,11 @@ async function main(): Promise<void> {
       process.exit(1);
     }
 
-    // 4. 合并构建结果
+    // 5. 合并构建结果
     log('📦 合并构建结果...');
     await mergeResults(results, debug);
 
-    // 5. 清理临时文件和策略目录
+    // 6. 清理临时文件和策略目录
     await cleanup(strategies, debug);
 
     // 收集构建结果信息
