@@ -2,18 +2,18 @@
 
 > 中文文档 | [中文文档](./README.md)
 
-A powerful Vite plugin for building multi-page applications with smart file routing and multi-strategy builds.
+A powerful Vite plugin for multi-page application development, providing multi-strategy builds, TypeScript configuration support, and command-line tools.
 
 ## Features
 
 - 🎯 **Multi-page support**: Automatically discover page entry files
-- 🔧 **Multi-strategy builds**: Support configuring different build strategies for different pages
+- 🔧 **Multi-strategy builds**: Support configuring different builds for different pages
 - 📝 **TypeScript configuration**: Support TypeScript configuration files
-- 🚀 **CLI tool**: Provide a command-line batch build tool
+- 🚀 **CLI tool**: Provide command-line batch build tools
 - 🔄 **Hot reload**: Development server supports page hot reload
 - 📦 **Smart merge**: Automatically merge multi-strategy build results
 
-## Installation
+## Install
 
 ```bash
 npm install @fchc8/vite-plugin-multi-page --save-dev
@@ -21,32 +21,78 @@ npm install @fchc8/vite-plugin-multi-page --save-dev
 
 ## Quick Start
 
-### 1. Create a configuration file
+### 1. Configure Vite
 
-Create a `multipage.config.ts` or `multipage.config.js`:
+Add the plugin in `vite.config.ts`:
 
 ```typescript
-export default context => {
+import { defineConfig } from 'vite';
+import { viteMultiPage } from '@fchc8/vite-plugin-multi-page';
+
+export default defineConfig({
+  plugins: [viteMultiPage()],
+});
+```
+
+### 2. Create Configuration File (Optional)
+
+The plugin provides reasonable default configurations, you can choose:
+
+**Option A: No Configuration File (Use Default Configuration)**
+
+- Automatically scan for page files under `src/pages/**/*.{ts,js}`, and the file with the name main as the page entry
+- Use `index.html` as the template
+- Create default build strategy
+
+**Option B: Simplest Configuration**
+
+Create `multipage.config.ts`:
+
+```typescript
+import { defineConfig } from '@fchc8/vite-plugin-multi-page';
+
+// Use all default values
+export default defineConfig(() => ({}));
+```
+
+**Option C: Complete Configuration**
+
+Create `multipage.config.ts` or `multipage.config.js`:
+
+```typescript
+import { defineConfig } from 'vite-plugin-multi-page';
+
+// Method 1: Object Configuration (Recommended)
+export default defineConfig({
+  entry: 'src/pages/**/*.{ts,js}',
+  template: 'index.html',
+  strategies: {
+    // Strategy Configuration...
+  },
+});
+
+// Method 2: Function Configuration (Dynamic Configuration)
+export default defineConfig(context => {
   const { mode, command, isCLI } = context;
   const isProduction = mode === 'production';
 
   return {
-    // Page entry matching rule
+    // Page entry matching rules
     entry: 'src/pages/**/*.{ts,js}',
 
-    // HTML template
+    // HTML Template
     template: 'index.html',
 
-    // Template placeholder
+    // Template Placeholder
     placeholder: '{{ENTRY_FILE}}',
 
-    // Excluded files
+    // Excluded Files
     exclude: ['src/shared/**/*.ts'],
 
-    // Debug mode
+    // Debug Mode
     debug: !isProduction || isCLI,
 
-    // Build strategy
+    // Build Strategy
     strategies: {
       default: {
         define: {
@@ -73,9 +119,9 @@ export default context => {
       },
     },
 
-    // Page configuration function
+    // Page Configuration Function
     pageConfigs: context => {
-      // Determine the application strategy based on the file path
+      // Determine the strategy based on the file path
       if (context.relativePath.includes('/mobile/')) {
         return {
           strategy: 'mobile',
@@ -86,7 +132,7 @@ export default context => {
         };
       }
 
-      // Default strategy
+      // Default Strategy
       return {
         strategy: 'default',
         define: {
@@ -96,50 +142,39 @@ export default context => {
       };
     },
   };
-};
-```
-
-### 2. Configure Vite
-
-Add the plugin in `vite.config.ts`:
-
-```typescript
-import { defineConfig } from 'vite';
-import { viteMultiPage } from '@fchc8/vite-plugin-multi-page';
-
-export default defineConfig({
-  plugins: [viteMultiPage()],
 });
 ```
 
-### 3. Create page files
+### 3. Create Page Files
 
 Create page files according to the convention:
+
+**Note**: Even if you use the empty configuration `defineConfig({})`, the plugin will automatically use the default strategy to process all pages, ensuring maximum compatibility.
 
 ```
 src/pages/
 ├── home.js                    # → /home.html
-├── about.js                   # → /about.html
+├── about.js                   # → /about.html (Default Strategy)
 ├── mobile/
-│   └── main.ts               # → /mobile.html (mobile strategy)
+│   └── main.ts               # → /mobile.html (Mobile Strategy)
 └── admin/
-    └── main.ts               # → /admin.html
+    └── main.ts               # → /admin.html (Admin Strategy)
 ```
 
-## Page discovery rules
+## Page Discovery Rules
 
 The plugin discovers page entries according to the following rules:
 
-1. **First-level files** (priority 1): `src/pages/home.js` → `/home.html`
-2. **Directory main files** (priority 2): `src/pages/mobile/main.ts` → `/mobile.html`
+1. **First-level Files** (Priority 1): `src/pages/home.js` → `/home.html`
+2. **Directory main files** (Priority 2): `src/pages/mobile/main.ts` → `/mobile.html`
 
-**Directory priority rule**: If both `src/pages/about.js` and `src/pages/about/main.ts` exist, `src/pages/about/main.ts` will be used.
+**Directory Priority Principle**: If both `src/pages/about.js` and `src/pages/about/main.ts` exist, `src/pages/about/main.ts` will be used.
 
-## Build strategies
+## Build Strategy
 
-### Strategy configuration
+### Strategy Configuration
 
-策略配置支持所有 Vite 配置选项:
+Strategy configuration supports all Vite configuration options:
 
 ```typescript
 strategies: {
@@ -161,7 +196,7 @@ strategies: {
 }
 ```
 
-### Page strategy assignment
+### Page Strategy Assignment
 
 Assign strategies to pages through the `pageConfigs` function:
 
@@ -181,9 +216,9 @@ pageConfigs: context => {
 };
 ```
 
-## 命令行工具
+## Command Line Tool
 
-### 批量构建
+### Batch Build
 
 ```bash
 # Build all strategies
@@ -196,7 +231,7 @@ npx vite-mp --host --port 3000
 npx vite-mp --debug
 ```
 
-### 开发服务器
+### Development Server
 
 ```bash
 # Start development server (all pages)
@@ -206,13 +241,13 @@ npm run dev
 npm run dev -- --strategy mobile
 ```
 
-## Environment variables
+## Environment Variables
 
 - `VITE_BUILD_STRATEGY`: Specify a single strategy build
 - `IS_MOBILE`: Mobile identifier (configured in define)
 - `API_BASE`: API base address (configured in define)
 
-## TypeScript support
+## TypeScript Support
 
 The plugin fully supports TypeScript configuration files:
 
@@ -230,21 +265,21 @@ const config: ConfigFunction = context => {
 export default config;
 ```
 
-## API reference
+## API Reference
 
-### Configuration options
+### Configuration Options
 
-| Option        | Type                       | Default                    | Description                  |
-| ------------- | -------------------------- | -------------------------- | ---------------------------- |
-| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | Page entry matching rule     |
-| `template`    | `string`                   | `'index.html'`             | HTML template file           |
-| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | Template placeholder         |
-| `exclude`     | `string[]`                 | `[]`                       | Excluded file patterns       |
-| `debug`       | `boolean`                  | `false`                    | Enable debug log             |
-| `strategies`  | `Record<string, Strategy>` | `{}`                       | Build strategy configuration |
-| `pageConfigs` | `Function \| Object`       | `{}`                       | Page                         |
+| Option        | Type                       | Default Value              | Description               |
+| ------------- | -------------------------- | -------------------------- | ------------------------- |
+| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | Page entry matching rules |
+| `template`    | `string`                   | `'index.html'`             | HTML Template File        |
+| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | 模板占位符                |
+| `exclude`     | `string[]`                 | `[]`                       | 排除的文件模式            |
+| `debug`       | `boolean`                  | `false`                    | 启用调试日志              |
+| `strategies`  | `Record<string, Strategy>` | `{}`                       | 构建策略配置              |
+| `pageConfigs` | `Function \| Object`       | `{}`                       | 页面配置                  |
 
-### Utility functions
+### Utility Functions
 
 ```typescript
 import { defineConfig, defineConfigTransform } from '@fchc8/vite-plugin-multi-page';
@@ -261,9 +296,9 @@ const transform = defineConfigTransform((config, context) => {
 });
 ```
 
-## Example project
+## Example Project
 
-See [example](./example) directory for a complete example project.
+See [example](./example) directory for the complete example project.
 
 ## License
 

@@ -40,7 +40,7 @@ export default defineConfig({
 
 **选项 A：无配置文件（使用默认配置）**
 
-- 自动扫描 `src/pages/**/*.{ts,js}` 下的页面文件
+- 自动扫描 `src/pages/**/*.{ts,js}` 下的页面文件，目录下含有文件名main的文件作为页面入口
 - 使用 `index.html` 作为模板
 - 创建默认构建策略
 
