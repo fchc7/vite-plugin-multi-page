@@ -101,38 +101,38 @@ const config = context => {
     },
 
     // 页面配置函数
-    pageConfigs: context => {
-      // 根据文件路径判断应用的策略
-      // if (context.relativePath.includes('/mobile/')) {
-      //   return {
-      //     strategy: 'mobile',
-      //     define: {
-      //       PAGE_NAME: context.pageName,
-      //       MOBILE_PAGE: true,
-      //     },
-      //     template: context.pageName === 'mobile' ? 'mobile.html' : undefined,
-      //   };
-      // }
+    // pageConfigs: context => {
+    //   // 根据文件路径判断应用的策略
+    //   if (context.relativePath.includes('/mobile/')) {
+    //     return {
+    //       strategy: 'mobile',
+    //       define: {
+    //         PAGE_NAME: context.pageName,
+    //         MOBILE_PAGE: true,
+    //       },
+    //       template: context.pageName === 'mobile' ? 'mobile.html' : undefined,
+    //     };
+    //   }
 
-      if (context.relativePath.includes('/tablet/')) {
-        return {
-          strategy: 'tablet',
-          define: {
-            PAGE_NAME: context.pageName,
-            TABLET_PAGE: true,
-          },
-        };
-      }
+    //   if (context.relativePath.includes('/tablet/')) {
+    //     return {
+    //       strategy: 'tablet',
+    //       define: {
+    //         PAGE_NAME: context.pageName,
+    //         TABLET_PAGE: true,
+    //       },
+    //     };
+    //   }
 
-      // 默认策略
-      return {
-        strategy: 'default',
-        define: {
-          PAGE_NAME: context.pageName,
-          DEFAULT_PAGE: true,
-        },
-      };
-    },
+    //   // 默认策略
+    //   return {
+    //     strategy: 'default',
+    //     define: {
+    //       PAGE_NAME: context.pageName,
+    //       DEFAULT_PAGE: true,
+    //     },
+    //   };
+    // },
   };
 };
 

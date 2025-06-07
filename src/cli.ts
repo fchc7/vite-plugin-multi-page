@@ -279,8 +279,14 @@ async function mergeResults(results: BuildResult[], debug: boolean): Promise<voi
   }
 
   log('✅ 构建结果合并完成');
-  log(`📁 HTML文件: ${htmlFiles.join(', ')}`);
+  log(`📁 生成页面: ${htmlFiles.join(', ')}`);
   log(`📦 资源目录: dist/assets/`);
+  log(
+    `🔧 处理策略: ${results
+      .filter(r => r.success)
+      .map(r => r.strategy)
+      .join(', ')}`
+  );
 }
 
 /**
@@ -438,14 +444,28 @@ async function main(): Promise<void> {
     // 5. 清理临时文件和策略目录
     await cleanup(strategies, debug);
 
+    // 收集构建结果信息
+    const successfulResults = results.filter(r => r.success);
+    const htmlFiles = fs
+      .readdirSync(path.resolve(process.cwd(), 'dist'))
+      .filter(file => file.endsWith('.html'));
+
     console.log(`\n🎉 所有策略构建成功！`);
     console.log(`📁 构建结果位于: dist/`);
-    console.log(
-      `🌐 HTML文件: ${results
-        .filter(r => r.success)
-        .map(r => r.strategy)
-        .join(', ')}`
-    );
+    console.log(`🌐 生成的页面: ${htmlFiles.join(', ')}`);
+    console.log(`📦 构建策略: ${successfulResults.map(r => r.strategy).join(', ')}`);
+
+    if (debug) {
+      console.log(`\n📋 详细信息:`);
+      successfulResults.forEach(result => {
+        const strategyDir = path.resolve(process.cwd(), result.outputDir);
+        if (fs.existsSync(strategyDir)) {
+          const files = fs.readdirSync(strategyDir);
+          const htmlCount = files.filter(f => f.endsWith('.html')).length;
+          console.log(`  - ${result.strategy}: ${htmlCount} 个页面`);
+        }
+      });
+    }
   } catch (error) {
     console.error('❌ 构建失败:', error instanceof Error ? error.message : error);
     process.exit(1);

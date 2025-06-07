@@ -154,6 +154,9 @@ function generateStrategyConfig(
   const htmlInputs: Record<string, string> = {};
   const tempFiles: string[] = [];
 
+  // 收集所有页面的 define 变量
+  const allPageDefines: Record<string, any> = {};
+
   // 为每个页面确定使用的HTML模板并创建临时文件
   for (const pageName of pages) {
     const entryFile = entryFiles.find(f => f.name === pageName);
@@ -168,6 +171,11 @@ function generateStrategyConfig(
     } as PageConfigContext;
 
     const pageConfig = getPageConfig(pageConfigs, pageContext, log);
+
+    // 收集页面级 define 变量
+    if (pageConfig?.define) {
+      Object.assign(allPageDefines, pageConfig.define);
+    }
 
     // 确定HTML模板
     let templatePath = defaultTemplate;
@@ -201,23 +209,6 @@ function generateStrategyConfig(
       );
     }
 
-    // 添加页面级define变量
-    if (pageConfig?.define) {
-      const defineScript = Object.entries(pageConfig.define)
-        .map(([key, value]) => {
-          const stringValue = typeof value === 'string' ? `"${value}"` : JSON.stringify(value);
-          return `window.${key} = ${stringValue};`;
-        })
-        .join('\n');
-
-      if (defineScript) {
-        templateContent = templateContent.replace(
-          /<\/head>/i,
-          `<script type="text/javascript">\n${defineScript}\n</script>\n</head>`
-        );
-      }
-    }
-
     // 创建临时HTML文件，使用新的命名规则：.temp.mp.[name].html
     const tempHtmlPath = path.resolve(process.cwd(), `.temp.mp.${pageName}.html`);
     fs.writeFileSync(tempHtmlPath, templateContent);
@@ -248,6 +239,15 @@ function generateStrategyConfig(
 
   if (strategyConfig) {
     config = mergeConfig(baseConfig, strategyConfig);
+  }
+
+  // 合并页面级 define 变量到 Vite 的 define 配置中
+  // 页面级 define 优先级高于策略级 define
+  if (Object.keys(allPageDefines).length > 0) {
+    config.define = {
+      ...config.define,
+      ...allPageDefines,
+    };
   }
 
   // 手动处理需要特殊控制的配置项，防止被mergeConfig覆盖
