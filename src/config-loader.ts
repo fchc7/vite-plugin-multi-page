@@ -49,7 +49,14 @@ export async function loadUserConfig(context: ConfigContext): Promise<Options | 
 
   if (customConfig) {
     // 使用项目自定义配置
-    return customConfig(context);
+    const result = customConfig(context);
+
+    // 如果配置函数返回 undefined 或 null，视为空配置
+    if (!result) {
+      return {};
+    }
+
+    return result;
   }
 
   // 没有找到用户配置

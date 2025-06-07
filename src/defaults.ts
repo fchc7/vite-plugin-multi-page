@@ -18,7 +18,9 @@ export const DEFAULT_CONFIG: Required<Omit<MultiPageOptions, '__forceBuildStrate
 /**
  * 合并用户配置和默认配置
  */
-export function mergeWithDefaults(userConfig: MultiPageOptions | null): MultiPageOptions {
+export function mergeWithDefaults(
+  userConfig: MultiPageOptions | null | undefined
+): MultiPageOptions {
   if (!userConfig) {
     return { ...DEFAULT_CONFIG };
   }

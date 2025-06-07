@@ -41,6 +41,13 @@ module.exports.getAvailableStrategies = getAvailableStrategies;`
         );
         fs.writeFileSync(cjsFile, content);
       }
+
+      // 删除 .d.mts 文件以避免 Node.js 兼容性问题
+      const mtsFile = path.resolve('dist/index.d.mts');
+      if (fs.existsSync(mtsFile)) {
+        fs.unlinkSync(mtsFile);
+        console.log('已删除 index.d.mts 文件以避免兼容性问题');
+      }
     },
   },
   // CLI配置

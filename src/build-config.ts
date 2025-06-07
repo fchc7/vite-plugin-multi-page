@@ -36,8 +36,6 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
       return {};
     }
 
-    log(`发现 ${entryFiles.length} 个页面入口`);
-
     // 2. 为每个页面分析配置和策略
     const pageStrategies = new Map<string, string>();
     const strategyPages = new Map<string, string[]>();
@@ -61,7 +59,7 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
       strategyPages.get(strategyName)?.push(entryFile.name);
     }
 
-    log('页面策略分布:', Object.fromEntries(pageStrategies));
+    log(`📄 发现 ${entryFiles.length} 个页面: ${entryFiles.map(f => f.name).join(', ')}`);
 
     // 3. 如果指定了强制策略，只构建该策略的页面
     if (forceBuildStrategy) {
@@ -91,8 +89,6 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
     // 4. 为每个策略生成构建配置
     for (const [strategyName, pages] of strategyPages) {
       if (pages.length === 0) continue;
-
-      log(`生成策略 "${strategyName}" 的构建配置, 页面: ${pages.join(', ')}`);
 
       // 获取策略配置，如果没有定义则使用空配置（允许默认策略）
       const strategyConfig = strategies[strategyName] || {};
@@ -130,7 +126,8 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
       buildConfigs['default'] = defaultConfig;
     }
 
-    log(`生成了 ${Object.keys(buildConfigs).length} 个构建配置`);
+    const strategyNames = Object.keys(buildConfigs);
+    log(`📦 构建策略: ${strategyNames.join(', ')}`);
     return buildConfigs;
   } catch (error) {
     log('生成构建配置失败:', error);

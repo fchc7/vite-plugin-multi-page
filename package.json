@@ -1,6 +1,6 @@
 {
   "name": "@fchc8/vite-plugin-multi-page",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "A powerful Vite plugin for building multi-page applications with smart file routing and multi-strategy builds",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -36,6 +36,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "postbuild": "rm -f dist/index.d.mts",
     "dev": "tsup --watch",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts --fix",

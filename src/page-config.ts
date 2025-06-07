@@ -14,7 +14,7 @@ export function getPageConfig(
   if (typeof pageConfigs === 'function') {
     const result = pageConfigs(context);
     if (result) {
-      log(`函数配置匹配页面 ${context.pageName}:`, result);
+      // log(`函数配置匹配页面 ${context.pageName}:`, result);
     }
     return result;
   }

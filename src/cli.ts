@@ -454,18 +454,6 @@ async function main(): Promise<void> {
     console.log(`📁 构建结果位于: dist/`);
     console.log(`🌐 生成的页面: ${htmlFiles.join(', ')}`);
     console.log(`📦 构建策略: ${successfulResults.map(r => r.strategy).join(', ')}`);
-
-    if (debug) {
-      console.log(`\n📋 详细信息:`);
-      successfulResults.forEach(result => {
-        const strategyDir = path.resolve(process.cwd(), result.outputDir);
-        if (fs.existsSync(strategyDir)) {
-          const files = fs.readdirSync(strategyDir);
-          const htmlCount = files.filter(f => f.endsWith('.html')).length;
-          console.log(`  - ${result.strategy}: ${htmlCount} 个页面`);
-        }
-      });
-    }
   } catch (error) {
     console.error('❌ 构建失败:', error instanceof Error ? error.message : error);
     process.exit(1);
