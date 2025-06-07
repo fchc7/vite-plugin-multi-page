@@ -10,8 +10,22 @@ export default defineConfig([
     clean: true,
     target: 'node16',
     shims: true,
-    external: ['vite', 'glob'],
+    external: [
+      // 设置所有依赖为外部依赖
+      'vite',
+      'glob',
+      'esbuild',
+      'cac',
+      // Node.js 内置模块
+      'node:fs',
+      'node:path',
+      'node:url',
+      'node:module',
+      'node:child_process',
+    ],
+    noExternal: [], // 确保没有依赖被打包进来
     splitting: false,
+    minify: true, // 添加压缩
     esbuildOptions(options) {
       options.legalComments = 'none';
     },
@@ -58,7 +72,21 @@ module.exports.mergeWithDefaults = mergeWithDefaults;`
     format: ['cjs'],
     target: 'node16',
     shims: true,
-    external: ['vite', 'glob'],
+    external: [
+      // 设置所有依赖为外部依赖
+      'vite',
+      'glob',
+      'esbuild',
+      'cac',
+      // Node.js 内置模块
+      'node:fs',
+      'node:path',
+      'node:url',
+      'node:module',
+      'node:child_process',
+    ],
+    noExternal: [], // 确保没有依赖被打包进来
+    minify: true, // 添加压缩
     cjsInterop: true,
     esbuildOptions(options) {
       options.legalComments = 'none';
