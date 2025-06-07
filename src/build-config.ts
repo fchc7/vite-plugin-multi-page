@@ -94,7 +94,8 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
 
       log(`生成策略 "${strategyName}" 的构建配置, 页面: ${pages.join(', ')}`);
 
-      const strategyConfig = strategies[strategyName];
+      // 获取策略配置，如果没有定义则使用空配置（允许默认策略）
+      const strategyConfig = strategies[strategyName] || {};
       const config = generateStrategyConfig(
         strategyName,
         pages,
@@ -107,6 +108,26 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
       );
 
       buildConfigs[strategyName] = config;
+    }
+
+    // 确保至少有一个构建配置
+    if (Object.keys(buildConfigs).length === 0) {
+      log('警告: 未生成任何构建配置，创建默认配置');
+
+      // 如果没有任何策略，创建一个默认策略包含所有页面
+      const allPageNames = entryFiles.map(f => f.name);
+      const defaultConfig = generateStrategyConfig(
+        'default',
+        allPageNames,
+        entryFiles,
+        {},
+        pageConfigs,
+        template,
+        placeholder,
+        log
+      );
+
+      buildConfigs['default'] = defaultConfig;
     }
 
     log(`生成了 ${Object.keys(buildConfigs).length} 个构建配置`);

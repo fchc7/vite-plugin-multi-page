@@ -26,7 +26,19 @@ npm install @fchc8/vite-plugin-multi-page --save-dev
 创建 `multipage.config.ts` 或 `multipage.config.js`:
 
 ```typescript
-export default context => {
+import { defineConfig } from 'vite-plugin-multi-page';
+
+// 方式1: 对象配置（推荐）
+export default defineConfig({
+  entry: 'src/pages/**/*.{ts,js}',
+  template: 'index.html',
+  strategies: {
+    // 策略配置...
+  },
+});
+
+// 方式2: 函数配置（动态配置）
+export default defineConfig(context => {
   const { mode, command, isCLI } = context;
   const isProduction = mode === 'production';
 
@@ -96,7 +108,7 @@ export default context => {
       };
     },
   };
-};
+});
 ```
 
 ### 2. 配置 Vite
@@ -115,6 +127,8 @@ export default defineConfig({
 ### 3. 创建页面文件
 
 按照约定创建页面文件:
+
+**注意**：即使使用空配置 `defineConfig({})`，插件也会自动使用默认策略处理所有页面，确保最大兼容性。
 
 ```
 src/pages/

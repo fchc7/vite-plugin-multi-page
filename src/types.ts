@@ -116,10 +116,14 @@ export type ConfigTransformFunction = (
 ) => MultiPageOptions;
 
 // 工具函数：定义配置
-export function defineConfig(
-  config: MultiPageOptions | ConfigFunction
-): MultiPageOptions | ConfigFunction {
-  return config;
+export function defineConfig(config: MultiPageOptions | ConfigFunction): ConfigFunction {
+  // 如果传入的是函数，直接返回
+  if (typeof config === 'function') {
+    return config;
+  }
+
+  // 如果传入的是对象，包装成函数返回
+  return () => config;
 }
 
 // 工具函数：定义配置变换

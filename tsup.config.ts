@@ -23,14 +23,15 @@ export default defineConfig([
       const cjsFile = path.resolve('dist/index.js');
       let content = fs.readFileSync(cjsFile, 'utf-8');
 
-      // 确保有正确的 module.exports
-      if (
-        !content.includes('module.exports = ') &&
-        content.includes('var src_default = viteMultiPage;')
-      ) {
+      // 查找并替换 module.exports 设置
+      if (content.includes('module.exports = __toCommonJS(src_exports);')) {
+        // 在文件末尾添加正确的导出
         content = content.replace(
-          /0 && \(module\.exports = \{[\s\S]*?\}\);/,
-          `module.exports = src_default;
+          /var src_default = viteMultiPage;[\s\S]*?$/,
+          `var src_default = viteMultiPage;
+
+// 修复 CommonJS 导出 - 确保默认导出是函数
+module.exports = src_default;
 module.exports.default = src_default;
 module.exports.viteMultiPage = viteMultiPage;
 module.exports.defineConfig = defineConfig;
@@ -39,7 +40,6 @@ module.exports.generateBuildConfig = generateBuildConfig;
 module.exports.getAvailableStrategies = getAvailableStrategies;`
         );
         fs.writeFileSync(cjsFile, content);
-        console.log('✅ 修复了 CommonJS 导出');
       }
     },
   },
