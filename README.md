@@ -21,7 +21,41 @@ npm install @fchc8/vite-plugin-multi-page --save-dev
 
 ## 快速开始
 
-### 1. 创建配置文件
+### 1. 配置 Vite
+
+在 `vite.config.ts` 中添加插件:
+
+```typescript
+import { defineConfig } from 'vite';
+import { viteMultiPage } from '@fchc8/vite-plugin-multi-page';
+
+export default defineConfig({
+  plugins: [viteMultiPage()],
+});
+```
+
+### 2. 创建配置文件（可选）
+
+插件提供了合理的默认配置，你可以选择：
+
+**选项 A：无配置文件（使用默认配置）**
+
+- 自动扫描 `src/pages/**/*.{ts,js}` 下的页面文件
+- 使用 `index.html` 作为模板
+- 创建默认构建策略
+
+**选项 B：最简配置**
+
+创建 `multipage.config.ts`：
+
+```typescript
+import { defineConfig } from '@fchc8/vite-plugin-multi-page';
+
+// 使用所有默认值
+export default defineConfig(() => ({}));
+```
+
+**选项 C：完整配置**
 
 创建 `multipage.config.ts` 或 `multipage.config.js`:
 
@@ -108,19 +142,6 @@ export default defineConfig(context => {
       };
     },
   };
-});
-```
-
-### 2. 配置 Vite
-
-在 `vite.config.ts` 中添加插件:
-
-```typescript
-import { defineConfig } from 'vite';
-import { viteMultiPage } from '@fchc8/vite-plugin-multi-page';
-
-export default defineConfig({
-  plugins: [viteMultiPage()],
 });
 ```
 

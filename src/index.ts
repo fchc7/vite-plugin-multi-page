@@ -4,6 +4,7 @@ import { mergeConfig } from 'vite';
 import { setupDevMiddleware } from './dev-server';
 import { generateBuildConfig } from './build-config';
 import { loadUserConfig, hasCustomConfig } from './config-loader';
+import { mergeWithDefaults } from './defaults';
 import type { Options, ConfigTransformFunction } from './types';
 
 // 导出类型和工具函数
@@ -25,35 +26,28 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
     name: 'vite-multi-page',
 
     async configResolved(config) {
-      // 检查是否有配置文件
-      if (!hasCustomConfig()) {
-        throw new Error(
-          '未找到多页面配置文件！请创建以下配置文件之一：\n' +
-            '  - multipage.config.js\n' +
-            '  - multipage.config.mjs\n' +
-            '  - multipage.config.ts'
-        );
+      // 加载用户配置文件（如果存在）
+      let userConfig: Options | null = null;
+
+      if (hasCustomConfig()) {
+        userConfig = await loadUserConfig({
+          mode: config.command === 'serve' ? 'development' : 'production',
+          command: config.command,
+          isCLI: false,
+        });
       }
 
-      // 加载用户配置文件
-      const userConfig = await loadUserConfig({
-        mode: config.command === 'serve' ? 'development' : 'production',
-        command: config.command,
-        isCLI: false,
-      });
-
-      if (!userConfig) {
-        throw new Error('配置文件加载失败！');
-      }
+      // 合并用户配置和默认配置
+      const mergedConfig = mergeWithDefaults(userConfig);
 
       // 应用配置变换函数（如果提供）
       resolvedOptions = transform
-        ? transform(userConfig, {
+        ? transform(mergedConfig, {
             mode: config.command === 'serve' ? 'development' : 'production',
             command: config.command,
             isCLI: false,
           })
-        : userConfig;
+        : mergedConfig;
 
       // 设置debug日志
       const debug = resolvedOptions.debug ?? false;
@@ -69,33 +63,28 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
       if (command === 'build') {
         // 在config钩子中临时加载配置，因为configResolved还没运行
         if (!resolvedOptions) {
-          if (!hasCustomConfig()) {
-            throw new Error(
-              '未找到多页面配置文件！请创建以下配置文件之一：\n' +
-                '  - multipage.config.js\n' +
-                '  - multipage.config.mjs\n' +
-                '  - multipage.config.ts'
-            );
+          // 加载用户配置文件（如果存在）
+          let userConfig: Options | null = null;
+
+          if (hasCustomConfig()) {
+            userConfig = await loadUserConfig({
+              mode: 'production',
+              command: 'build',
+              isCLI: false,
+            });
           }
 
-          const userConfig = await loadUserConfig({
-            mode: 'production',
-            command: 'build',
-            isCLI: false,
-          });
-
-          if (!userConfig) {
-            throw new Error('配置文件加载失败！');
-          }
+          // 合并用户配置和默认配置
+          const mergedConfig = mergeWithDefaults(userConfig);
 
           // 应用配置变换函数（如果提供）
           resolvedOptions = transform
-            ? transform(userConfig, {
+            ? transform(mergedConfig, {
                 mode: 'production',
                 command: 'build',
                 isCLI: false,
               })
-            : userConfig;
+            : mergedConfig;
           const debug = resolvedOptions.debug ?? false;
           log = debug ? console.log.bind(console, '[vite-multi-page]') : () => {};
         }
@@ -134,6 +123,23 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
           });
         } else {
           log('未找到可用的构建策略，使用默认配置');
+
+          throw new Error(
+            '❌ 构建失败: 未找到任何构建策略\n\n' +
+              '可能的原因：\n' +
+              '  1. 配置文件返回空对象 {}\n' +
+              '  2. 未找到匹配的入口文件\n' +
+              '  3. 模板文件不存在\n' +
+              '  4. 未配置 strategies 对象\n\n' +
+              '最小配置示例：\n' +
+              'export default () => ({\n' +
+              '  entry: "src/pages/**/*.{ts,js}",\n' +
+              '  template: "index.html",\n' +
+              '  strategies: {\n' +
+              '    default: {}\n' +
+              '  }\n' +
+              '});'
+          );
         }
       }
     },
