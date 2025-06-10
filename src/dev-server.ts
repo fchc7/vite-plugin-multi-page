@@ -21,9 +21,12 @@ export function configureDevServer(
       return;
     }
 
-    // 获取指定的策略，优先使用命令行参数
-    const cliStrategy = ((server.config as any).__cliStrategy ||
-      (server.config as any).strategy) as string | undefined;
+    // 获取指定的策略，优先使用开发模式传入的策略
+    const cliStrategy =
+      options.devStrategy ||
+      (((server.config as any).__cliStrategy || (server.config as any).strategy) as
+        | string
+        | undefined);
 
     // 如果指定了策略，则只显示该策略下的页面或没有指定策略的默认页面
     if (cliStrategy) {
@@ -31,12 +34,21 @@ export function configureDevServer(
 
       // 过滤入口文件，只保留匹配策略的页面
       entryFiles = entryFiles.filter(file => {
-        const pageName = file.name;
-        const pageStrategy = options.appliedStrategies?.get(pageName) || undefined;
+        // 动态获取页面策略
+        const pageContext = {
+          pageName: file.name,
+          filePath: file.file,
+          relativePath: path.relative(process.cwd(), file.file),
+          strategy: undefined,
+          isMatched: false,
+        } as PageConfigContext;
+
+        const pageConfig = getPageConfig(options.pageConfigs, pageContext, log);
+        const pageStrategy = pageConfig?.strategy || 'default';
 
         // 在指定策略为default时，包含所有没有指定策略的页面
         if (cliStrategy === 'default') {
-          return !pageStrategy || pageStrategy === 'default';
+          return pageStrategy === 'default';
         }
 
         // 其他策略，只包含匹配的页面
@@ -90,100 +102,7 @@ export function configureDevServer(
           return next();
         }
 
-        // 获取页面配置
-        const pageContext = {
-          pageName: matchedFile.name,
-          filePath: matchedFile.file,
-          relativePath: path.relative(process.cwd(), matchedFile.file),
-          strategy: undefined,
-          isMatched: false,
-        } as PageConfigContext;
-
-        const pageConfig = getPageConfig(options.pageConfigs, pageContext, log);
-
-        // 应用配置策略
-        if (pageConfig?.strategy) {
-          pageContext.strategy = pageConfig.strategy;
-        } else if (options.appliedStrategies?.has(pageName)) {
-          // 使用缓存的策略信息
-          const strategyName = options.appliedStrategies.get(pageName);
-          if (strategyName) {
-            pageContext.strategy = strategyName;
-          }
-        }
-
-        // 获取模板文件路径
-        // 首先检查是否有页面特定的模板（例如mobile.html对应mobile页面）
-        let templatePath = '';
-
-        // 尝试以页面名称查找匹配的模板
-        const pageSpecificTemplate = path.resolve(process.cwd(), `${pageName}.html`);
-        if (fs.existsSync(pageSpecificTemplate)) {
-          templatePath = pageSpecificTemplate;
-        }
-        // 然后尝试使用页面配置中指定的模板
-        else if (pageConfig?.template) {
-          templatePath = path.resolve(process.cwd(), pageConfig.template);
-        }
-        // 最后使用默认模板
-        else {
-          templatePath = path.resolve(process.cwd(), options.template);
-        }
-
-        if (!fs.existsSync(templatePath)) {
-          return next();
-        }
-
-        // 读取并修改模板
-        let html = fs.readFileSync(templatePath, 'utf-8');
-
-        // 检查模板中是否包含占位符
-        const containsPlaceholder = html.includes(options.placeholder);
-
-        // 替换占位符为入口文件路径
-        if (containsPlaceholder) {
-          const originalHtml = html;
-
-          // 方式1: 直接字符串替换
-          html = html.split(options.placeholder).join(`/${matchedFile.file}`);
-
-          // 检查替换结果
-          if (html === originalHtml) {
-            // 方式2: 正则表达式替换
-            const escapedPlaceholder = escapeRegExp(options.placeholder);
-            const placeholderRegex = new RegExp(escapedPlaceholder, 'g');
-            html = originalHtml.replace(placeholderRegex, `/${matchedFile.file}`);
-
-            // 检查替换结果
-            if (html === originalHtml) {
-              // 方式3: 硬编码替换具体的占位符格式
-              html = originalHtml.replace(/\{\{ENTRY_FILE\}\}/g, `/${matchedFile.file}`);
-            }
-          }
-        }
-
-        // 添加页面级define变量
-        if (pageConfig?.define) {
-          const defineScript = Object.entries(pageConfig.define)
-            .map(([key, value]) => {
-              const stringValue = typeof value === 'string' ? `"${value}"` : JSON.stringify(value);
-              return `window.${key} = ${stringValue};`;
-            })
-            .join('\n');
-
-          if (defineScript) {
-            // 注入到head标签底部
-            html = html.replace(
-              /<\/head>/i,
-              `<script type="text/javascript">\n${defineScript}\n</script>\n</head>`
-            );
-          }
-        }
-
-        // 发送响应
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'text/html');
-        res.end(html);
+        return servePageHtml(res, matchedFile, options, log);
       } catch (error) {
         log(`开发服务器处理请求失败: ${error}`);
         next(error);
@@ -195,6 +114,111 @@ export function configureDevServer(
     log(`配置开发服务器失败: ${error}`);
     throw error;
   }
+}
+
+// 提取页面HTML服务逻辑
+function servePageHtml(
+  res: any,
+  matchedFile: { name: string; file: string },
+  options: DevServerOptions,
+  log: (...args: any[]) => void
+) {
+  // 获取页面配置
+  const pageContext = {
+    pageName: matchedFile.name,
+    filePath: matchedFile.file,
+    relativePath: path.relative(process.cwd(), matchedFile.file),
+    strategy: undefined,
+    isMatched: false,
+  } as PageConfigContext;
+
+  const pageConfig = getPageConfig(options.pageConfigs, pageContext, log);
+
+  // 应用配置策略
+  if (pageConfig?.strategy) {
+    pageContext.strategy = pageConfig.strategy;
+  } else if (options.appliedStrategies?.has(matchedFile.name)) {
+    // 使用缓存的策略信息
+    const strategyName = options.appliedStrategies.get(matchedFile.name);
+    if (strategyName) {
+      pageContext.strategy = strategyName;
+    }
+  }
+
+  // 获取模板文件路径
+  // 首先检查是否有页面特定的模板（例如mobile.html对应mobile页面）
+  let templatePath = '';
+
+  // 尝试以页面名称查找匹配的模板
+  const pageSpecificTemplate = path.resolve(process.cwd(), `${matchedFile.name}.html`);
+  if (fs.existsSync(pageSpecificTemplate)) {
+    templatePath = pageSpecificTemplate;
+  }
+  // 然后尝试使用页面配置中指定的模板
+  else if (pageConfig?.template) {
+    templatePath = path.resolve(process.cwd(), pageConfig.template);
+  }
+  // 最后使用默认模板
+  else {
+    templatePath = path.resolve(process.cwd(), options.template);
+  }
+
+  if (!fs.existsSync(templatePath)) {
+    res.statusCode = 404;
+    res.end('Template not found');
+    return;
+  }
+
+  // 读取并修改模板
+  let html = fs.readFileSync(templatePath, 'utf-8');
+
+  // 检查模板中是否包含占位符
+  const containsPlaceholder = html.includes(options.placeholder);
+
+  // 替换占位符为入口文件路径
+  if (containsPlaceholder) {
+    const originalHtml = html;
+
+    // 方式1: 直接字符串替换
+    html = html.split(options.placeholder).join(`/${matchedFile.file}`);
+
+    // 检查替换结果
+    if (html === originalHtml) {
+      // 方式2: 正则表达式替换
+      const escapedPlaceholder = escapeRegExp(options.placeholder);
+      const placeholderRegex = new RegExp(escapedPlaceholder, 'g');
+      html = originalHtml.replace(placeholderRegex, `/${matchedFile.file}`);
+
+      // 检查替换结果
+      if (html === originalHtml) {
+        // 方式3: 硬编码替换具体的占位符格式
+        html = originalHtml.replace(/\{\{ENTRY_FILE\}\}/g, `/${matchedFile.file}`);
+      }
+    }
+  }
+
+  // 添加页面级define变量
+  if (pageConfig?.define) {
+    const defineScript = Object.entries(pageConfig.define)
+      .map(([key, value]) => {
+        const stringValue = typeof value === 'string' ? `"${value}"` : JSON.stringify(value);
+        return `window.${key} = ${stringValue};`;
+      })
+      .join('\n');
+
+    if (defineScript) {
+      // 注入到head标签底部
+      html = html.replace(
+        /<\/head>/i,
+        `<script type="text/javascript">\n${defineScript}\n</script>\n</head>`
+      );
+    }
+  }
+
+  // 发送响应
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/html');
+  res.end(html);
 }
 
 // 为了兼容性，导出setupDevMiddleware作为configureDevServer的别名

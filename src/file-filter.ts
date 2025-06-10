@@ -23,17 +23,21 @@ export function filterEntryFiles(
       continue;
     }
 
-    const relativePath = path.relative(basePattern, file);
-    const pathParts = relativePath.split(path.sep);
+    // 统一使用正斜杠处理路径，确保Windows兼容性
+    const normalizedFile = file.replace(/\\/g, '/');
+    const normalizedBasePattern = basePattern.replace(/\\/g, '/');
+
+    const relativePath = path.posix.relative(normalizedBasePattern, normalizedFile);
+    const pathParts = relativePath.split('/'); // 使用正斜杠分割
 
     if (pathParts.length === 1) {
       // 第一级文件：src/pages/about.js -> /about.html
       const fileName = pathParts[0];
-      const name = path.basename(fileName, path.extname(fileName));
+      const name = path.posix.basename(fileName, path.posix.extname(fileName));
       candidateFiles.push({ name, file, priority: 1 });
     } else if (pathParts.length >= 2) {
       // 目录下的文件
-      const fileName = path.basename(file, path.extname(file));
+      const fileName = path.posix.basename(normalizedFile, path.posix.extname(normalizedFile));
       const dirName = pathParts[0];
 
       if (fileName === 'main') {

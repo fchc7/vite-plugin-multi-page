@@ -24,6 +24,7 @@ export interface DevServerOptions {
   strategies?: Record<string, ConfigStrategy>;
   pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
   appliedStrategies?: Map<string, string>;
+  devStrategy?: string; // 开发模式下指定的策略
 }
 
 // 构建配置选项

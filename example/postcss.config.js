@@ -1,6 +1,6 @@
 // 动态PostCSS配置，根据构建策略应用不同的插件
 export default ({ env }) => {
-  const strategy = process.env.VITE_BUILD_STRATEGY || 'default';
+  const strategy = process.env.VITE_MULTI_PAGE_STRATEGY || 'default';
 
   console.log(`[PostCSS] 当前构建策略: ${strategy}`);
 

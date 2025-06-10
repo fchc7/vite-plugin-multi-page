@@ -15,11 +15,17 @@ interface BuildResult {
 /**
  * 解析命令行参数
  */
-function parseArgs(): { viteBuildArgs: string[]; debug: boolean; cwd?: string } {
+function parseArgs(): {
+  viteBuildArgs: string[];
+  debug: boolean;
+  cwd?: string;
+  strategies?: string[];
+} {
   const args = process.argv.slice(2);
   const viteBuildArgs: string[] = [];
   let debug = false;
   let cwd: string | undefined;
+  let strategies: string[] | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -27,22 +33,28 @@ function parseArgs(): { viteBuildArgs: string[]; debug: boolean; cwd?: string } 
       debug = true;
     } else if (arg === '--cwd') {
       cwd = args[++i]; // 获取下一个参数作为目录
+    } else if (arg === '--strategy') {
+      const strategyArg = args[++i]; // 获取策略参数
+      strategies = strategyArg.split(',').map(s => s.trim()); // 支持逗号分隔的多策略
     } else if (arg === '--help' || arg === '-h') {
       console.log(`
-使用方法: vite-multi-page-build [选项]
+使用方法: vite-mp [选项]
 
 选项:
-  --debug          启用调试模式
-  --cwd <dir>      指定工作目录
-  --help, -h       显示帮助信息
+  --debug              启用调试模式
+  --cwd <dir>          指定工作目录
+  --strategy <list>    指定构建策略，支持逗号分隔多个策略
+  --help, -h           显示帮助信息
   
 其他所有参数将传递给 vite build 命令
 
 示例:
-  vite-mp
-  vite-mp --debug
-  vite-mp --cwd example
-  vite-mp --mode production --debug
+  vite-mp                              # 构建所有策略
+  vite-mp --strategy mobile            # 只构建mobile策略
+  vite-mp --strategy mobile,tablet     # 构建mobile和tablet策略
+  vite-mp --debug                      # 启用调试模式
+  vite-mp --cwd example                # 在example目录运行
+  vite-mp --mode production --debug    # 传递额外参数给vite
 `);
       process.exit(0);
     } else if (arg !== 'build') {
@@ -51,7 +63,7 @@ function parseArgs(): { viteBuildArgs: string[]; debug: boolean; cwd?: string } 
     }
   }
 
-  return { viteBuildArgs, debug, cwd };
+  return { viteBuildArgs, debug, cwd, strategies };
 }
 
 /**
@@ -96,7 +108,7 @@ function buildStrategy(
     // 设置环境变量来指定构建策略
     const env = {
       ...process.env,
-      VITE_BUILD_STRATEGY: strategy,
+      VITE_MULTI_PAGE_STRATEGY: strategy,
     };
 
     // 构建命令
@@ -376,7 +388,7 @@ async function cleanup(strategies: string[], debug: boolean): Promise<void> {
  * 主函数
  */
 async function main(): Promise<void> {
-  const { viteBuildArgs, debug, cwd } = parseArgs();
+  const { viteBuildArgs, debug, cwd, strategies: specifiedStrategies } = parseArgs();
   const log = debug ? console.log.bind(console, '[main]') : () => {};
 
   // 如果指定了工作目录，切换到该目录
@@ -397,7 +409,7 @@ async function main(): Promise<void> {
     log('📋 加载配置...');
     const options = await loadViteConfig();
     const { getAvailableStrategies } = await import('./build-config');
-    const strategies = getAvailableStrategies({
+    const availableStrategies = getAvailableStrategies({
       entry: options.entry || 'src/pages/*/main.{ts,js}',
       exclude: options.exclude || [],
       template: options.template || 'index.html',
@@ -406,18 +418,35 @@ async function main(): Promise<void> {
       strategies: options.strategies || {},
     });
 
-    if (strategies.length === 0) {
+    if (availableStrategies.length === 0) {
       throw new Error('未找到任何构建策略');
     }
 
-    log(`发现 ${strategies.length} 个策略: ${strategies.join(', ')}`);
+    // 2. 确定要构建的策略
+    let strategies: string[];
+    if (specifiedStrategies && specifiedStrategies.length > 0) {
+      // 验证指定的策略是否存在
+      const invalidStrategies = specifiedStrategies.filter(s => !availableStrategies.includes(s));
+      if (invalidStrategies.length > 0) {
+        throw new Error(
+          `指定的策略不存在: ${invalidStrategies.join(', ')}\n可用策略: ${availableStrategies.join(
+            ', '
+          )}`
+        );
+      }
+      strategies = specifiedStrategies;
+      log(`使用指定的策略: ${strategies.join(', ')}`);
+    } else {
+      strategies = availableStrategies;
+      log(`构建所有可用策略: ${strategies.join(', ')}`);
+    }
 
-    // 2. 清理输出目录
+    // 3. 清理输出目录
     log('🧹 清理输出目录...');
     const { cleanViteOutputDirectory } = await import('./build-config');
     cleanViteOutputDirectory(viteBuildArgs);
 
-    // 3. 并行构建所有策略
+    // 4. 并行构建所有策略
     log('🔨 开始并行构建...');
     const buildPromises = strategies.map(strategy => buildStrategy(strategy, viteBuildArgs, debug));
 

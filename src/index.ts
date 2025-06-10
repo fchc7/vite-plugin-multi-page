@@ -60,6 +60,33 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
     },
 
     async config(config, { command }) {
+      // 处理开发模式下的策略参数
+      if (command === 'serve') {
+        // 检查命令行参数中的策略设置
+        const args = process.argv;
+
+        // 查找 --strategy=value 格式的参数
+        const strategyArg = args.find(arg => arg.startsWith('--strategy='));
+        if (strategyArg) {
+          const strategy = strategyArg.split('=')[1];
+          if (strategy) {
+            process.env.VITE_MULTI_PAGE_STRATEGY = strategy;
+          }
+        }
+        // 查找 --strategy value 格式的参数
+        else {
+          const strategyIndex = args.findIndex(arg => arg === '--strategy');
+          if (strategyIndex !== -1 && strategyIndex + 1 < args.length) {
+            const strategy = args[strategyIndex + 1];
+            process.env.VITE_MULTI_PAGE_STRATEGY = strategy;
+          }
+        }
+
+        // 确保有默认策略
+        if (!process.env.VITE_MULTI_PAGE_STRATEGY) {
+          process.env.VITE_MULTI_PAGE_STRATEGY = 'default';
+        }
+      }
       if (command === 'build') {
         // 在config钩子中临时加载配置，因为configResolved还没运行
         if (!resolvedOptions) {
@@ -92,7 +119,7 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
         log('配置构建模式');
 
         // 生成构建配置
-        const forceBuildStrategy = process.env.VITE_BUILD_STRATEGY;
+        const forceBuildStrategy = process.env.VITE_MULTI_PAGE_STRATEGY;
         const buildConfigs = generateBuildConfig({
           entry: resolvedOptions.entry || 'src/pages/**/*.{ts,js}',
           exclude: resolvedOptions.exclude || [],
@@ -148,6 +175,12 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
       if (server.config.command === 'serve') {
         log('配置开发服务器');
 
+        // 处理开发模式下的策略参数
+        // 从环境变量中获取策略，默认为 default
+        const devStrategy = process.env.VITE_MULTI_PAGE_STRATEGY || 'default';
+
+        log(`开发模式策略: ${devStrategy}`);
+
         setupDevMiddleware(
           server,
           {
@@ -157,6 +190,7 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
             placeholder: resolvedOptions.placeholder || '{{ENTRY_FILE}}',
             strategies: resolvedOptions.strategies || {},
             pageConfigs: resolvedOptions.pageConfigs || {},
+            devStrategy: devStrategy, // 传递策略给开发服务器
           },
           log
         );
