@@ -196,6 +196,21 @@ strategies: {
 }
 ```
 
+### Build Output Merge Strategy
+
+Control how build outputs are organized using the `merge` option:
+
+```typescript
+export default defineConfig({
+  // ... other configurations
+  merge: 'all' | 'strategy' | 'page',
+});
+```
+
+- **`all`** (default): All HTML files in root directory, assets merged into `/dist/assets/`
+- **`strategy`**: Group by strategy, e.g., `/dist/mobile/page1.html`, `/dist/desktop/page1.html`
+- **`page`**: Group by page, e.g., `/dist/homePage/index.html`, `/dist/aboutPage/index.html`
+
 ### Page Strategy Assignment
 
 Assign strategies to pages through the `pageConfigs` function:

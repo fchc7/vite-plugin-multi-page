@@ -72,7 +72,7 @@ function reorganizeAssets(
       if (!allAssetUsage.has(assetFile)) {
         allAssetUsage.set(assetFile, []);
       }
-      allAssetUsage.get(assetFile)!.push(fileName);
+      allAssetUsage.get(assetFile)?.push(fileName);
     }
 
     // 确定目标目录

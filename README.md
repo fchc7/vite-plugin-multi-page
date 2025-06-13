@@ -196,6 +196,21 @@ strategies: {
 }
 ```
 
+### 构建产物合并策略
+
+通过 `merge` 选项控制构建产物的组织方式：
+
+```typescript
+export default defineConfig({
+  // ... 其他配置
+  merge: 'all' | 'strategy' | 'page',
+});
+```
+
+- **`all`** (默认): 所有HTML文件放在根目录，资源合并到 `/dist/assets/`
+- **`strategy`**: 按策略分组，如 `/dist/mobile/page1.html`、`/dist/desktop/page1.html`
+- **`page`**: 按页面分组，如 `/dist/homePage/index.html`、`/dist/aboutPage/index.html`
+
 ### 页面策略分配
 
 通过 `pageConfigs` 函数为页面分配策略:
