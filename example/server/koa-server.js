@@ -1,210 +1,95 @@
 import Koa from 'koa';
-import serve from 'koa-static';
 import Router from 'koa-router';
+import serve from 'koa-static';
+import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { readdir, stat, readFile } from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 const app = new Koa();
 const router = new Router();
 
-// 构建产物目录
-const distPath = join(__dirname, '../dist');
+// 从命令行参数获取页面名称，默认为 'home'
+const args = process.argv.slice(2);
+const pageArg = args.find(arg => arg.startsWith('--page='));
+const pageName = pageArg ? pageArg.split('=')[1] : 'home';
 
-// 获取文件大小格式化
-function formatBytes(bytes, decimals = 2) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+// 验证页面目录是否存在
+const distPath = path.join(__dirname, '../dist');
+const pagePath = path.join(distPath, pageName);
+
+if (!fs.existsSync(pagePath)) {
+  console.error(`❌ 错误: 页面 '${pageName}' 不存在`);
+  console.log(`📁 可用的页面:`);
+
+  // 列出所有可用页面
+  try {
+    const pages = fs.readdirSync(distPath).filter(item => {
+      return fs.statSync(path.join(distPath, item)).isDirectory();
+    });
+    pages.forEach(page => console.log(`   - ${page}`));
+  } catch (error) {
+    console.error('无法读取 dist 目录');
+  }
+
+  console.log(`\n💡 使用方法: node server/koa-server.js --page=页面名称`);
+  process.exit(1);
 }
 
-// 递归获取目录文件信息
-async function getDirectoryInfo(dirPath, relativePath = '') {
-  const files = [];
-  try {
-    const items = await readdir(dirPath);
+// 设置静态文件服务，指向特定页面目录
+app.use(serve(pagePath));
 
-    for (const item of items) {
-      const fullPath = join(dirPath, item);
-      const itemStat = await stat(fullPath);
-      const itemRelativePath = join(relativePath, item);
-
-      if (itemStat.isDirectory()) {
-        const subFiles = await getDirectoryInfo(fullPath, itemRelativePath);
-        files.push({
-          name: item,
-          type: 'directory',
-          path: itemRelativePath,
-          size: '-',
-          files: subFiles.length,
-          children: subFiles,
-        });
-      } else {
-        files.push({
-          name: item,
-          type: 'file',
-          path: itemRelativePath,
-          size: formatBytes(itemStat.size),
-          bytes: itemStat.size,
-          modified: itemStat.mtime.toISOString(),
-        });
-      }
-    }
-  } catch (error) {
-    console.error('读取目录失败:', error.message);
-  }
-
-  return files.sort((a, b) => {
-    // 目录排在前面，然后按名称排序
-    if (a.type !== b.type) {
-      return a.type === 'directory' ? -1 : 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
-}
-
-// 构建产物分析
-router.get('/api/build-analysis', async ctx => {
-  try {
-    const files = await getDirectoryInfo(distPath);
-
-    // 计算总大小
-    function calculateTotalSize(fileList) {
-      return fileList.reduce((total, file) => {
-        if (file.type === 'file') {
-          return total + (file.bytes || 0);
-        } else if (file.children) {
-          return total + calculateTotalSize(file.children);
-        }
-        return total;
-      }, 0);
-    }
-
-    const totalSize = calculateTotalSize(files);
-
-    // 按文件类型分类
-    const fileTypes = {};
-    function categorizeFiles(fileList) {
-      fileList.forEach(file => {
-        if (file.type === 'file') {
-          const ext = file.name.split('.').pop().toLowerCase();
-          if (!fileTypes[ext]) {
-            fileTypes[ext] = { count: 0, size: 0, files: [] };
-          }
-          fileTypes[ext].count++;
-          fileTypes[ext].size += file.bytes || 0;
-          fileTypes[ext].files.push(file);
-        } else if (file.children) {
-          categorizeFiles(file.children);
-        }
-      });
-    }
-
-    categorizeFiles(files);
-
-    // 找出最大的文件
-    const allFiles = [];
-    function collectFiles(fileList) {
-      fileList.forEach(file => {
-        if (file.type === 'file') {
-          allFiles.push(file);
-        } else if (file.children) {
-          collectFiles(file.children);
-        }
-      });
-    }
-
-    collectFiles(files);
-    const largestFiles = allFiles.sort((a, b) => (b.bytes || 0) - (a.bytes || 0)).slice(0, 10);
-
-    ctx.body = {
-      success: true,
-      data: {
-        files,
-        totalSize: formatBytes(totalSize),
-        totalSizeBytes: totalSize,
-        fileCount: allFiles.length,
-        fileTypes: Object.entries(fileTypes)
-          .map(([ext, info]) => ({
-            extension: ext,
-            count: info.count,
-            size: formatBytes(info.size),
-            sizeBytes: info.size,
-            files: info.files,
-          }))
-          .sort((a, b) => b.sizeBytes - a.sizeBytes),
-        largestFiles,
-      },
-    };
-  } catch (error) {
-    ctx.status = 500;
-    ctx.body = {
-      success: false,
-      error: error.message,
-    };
-  }
-});
-
-// 获取特定文件内容
-router.get('/api/file-content/:path+', async ctx => {
-  try {
-    const filePath = join(distPath, ctx.params.path);
-    const content = await readFile(filePath, 'utf-8');
-    const fileStats = await stat(filePath);
-
-    ctx.body = {
-      success: true,
-      data: {
-        content,
-        size: formatBytes(fileStats.size),
-        modified: fileStats.mtime.toISOString(),
-        path: ctx.params.path,
-      },
-    };
-  } catch (error) {
-    ctx.status = 404;
-    ctx.body = {
-      success: false,
-      error: '文件不存在或无法读取',
-    };
-  }
-});
-
-// 首页重定向到仪表板
+// 路由配置
 router.get('/', async ctx => {
-  ctx.redirect('/dashboard');
+  const indexPath = path.join(pagePath, 'index.html');
+
+  if (fs.existsSync(indexPath)) {
+    ctx.type = 'html';
+    ctx.body = fs.readFileSync(indexPath, 'utf8');
+  } else {
+    ctx.status = 404;
+    ctx.body = `页面 '${pageName}' 的 index.html 文件不存在`;
+  }
 });
 
-// 使用路由
+// 处理所有路径，支持 SPA 路由
+router.get('/(.*)', async ctx => {
+  const requestedPath = ctx.path;
+  const filePath = path.join(pagePath, requestedPath);
+
+  // 检查是否是文件请求
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    return; // 让静态文件中间件处理
+  }
+
+  // 对于非文件请求，返回 index.html (支持 SPA 路由)
+  const indexPath = path.join(pagePath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    ctx.type = 'html';
+    ctx.body = fs.readFileSync(indexPath, 'utf8');
+  } else {
+    ctx.status = 404;
+    ctx.body = `页面 '${pageName}' 的 index.html 文件不存在`;
+  }
+});
+
 app.use(router.routes());
 app.use(router.allowedMethods());
 
-// 静态文件服务（dist 目录）
-app.use(serve(distPath));
+const PORT = process.env.PORT || 3000;
 
-// 错误处理
-app.on('error', (err, ctx) => {
-  console.error('服务器错误:', err);
+app.listen(PORT, () => {
+  console.log(`🚀 服务器已启动`);
+  console.log(`📄 当前预览页面: ${pageName}`);
+  console.log(`🌐 访问地址: http://localhost:${PORT}`);
+  console.log(`📁 服务目录: ${pagePath}`);
+  console.log(`\n💡 切换页面: node server/koa-server.js --page=其他页面名称`);
 });
 
-// 启动服务器
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`
-🚀 Koa 服务器已启动!
-
-演示页面:
-- Vue 移动端: http://localhost:${PORT}/mobile.html
-- 首页: http://localhost:${PORT}/home.html
-- 关于: http://localhost:${PORT}/about.html
-
-API 接口:
-- 构建分析: http://localhost:${PORT}/api/build-analysis
-  `);
+// 优雅关闭
+process.on('SIGINT', () => {
+  console.log('\n👋 服务器已关闭');
+  process.exit(0);
 });

@@ -123,7 +123,7 @@ function reorganizeAssets(
     }
   });
 
-  // 第三阶段：复制资源文件到各个页面目录
+  // 第三阶段：智能匹配带前缀的资源文件并复制到对应的页面目录
   bundleInfo.forEach(({ assets, targetDir }, pageName) => {
     // 创建目标目录和assets子目录
     const pageAssetsDir = path.resolve(targetDir, 'assets');
@@ -145,6 +145,30 @@ function reorganizeAssets(
         log(`警告: 资源文件不存在: ${sourcePath}`);
       }
     });
+
+    // 第三阶段补充：查找带有页面前缀的资源文件
+    if (fs.existsSync(assetsDir)) {
+      const allAssetFiles = fs.readdirSync(assetsDir);
+      const pagePrefix = `mp${pageName}-`;
+
+      // 查找属于这个页面的带前缀的文件
+      const prefixedFiles = allAssetFiles.filter(file => file.startsWith(pagePrefix));
+
+      prefixedFiles.forEach(prefixedFile => {
+        // 检查该文件是否已经在assets列表中
+        if (!assets.includes(prefixedFile)) {
+          const sourcePath = path.resolve(assetsDir, prefixedFile);
+          const targetPath = path.resolve(pageAssetsDir, prefixedFile);
+
+          if (fs.existsSync(sourcePath)) {
+            fs.copyFileSync(sourcePath, targetPath);
+            log(
+              `复制前缀匹配的资源文件到 ${pageName}: assets/${prefixedFile} -> ${path.relative(distDir, targetPath)}`
+            );
+          }
+        }
+      });
+    }
   });
 
   log('第三阶段补充：处理public目录资源');

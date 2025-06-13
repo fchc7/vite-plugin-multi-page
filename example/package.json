@@ -13,9 +13,16 @@
     "build:multi": "vite-mp --strategy mobile,about",
     "preview": "vite preview",
     "serve": "node server/koa-server.js",
+    "serve:home": "node server/koa-server.js --page=home",
+    "serve:mobile": "node server/koa-server.js --page=mobile",
+    "serve:tablet": "node server/koa-server.js --page=tablet",
+    "serve:desktop": "node server/koa-server.js --page=desktop",
+    "serve:about": "node server/koa-server.js --page=about",
+    "serve:spa": "node server/koa-server.js --page=spa",
     "test": "node test-config.js"
   },
   "devDependencies": {
+    "@types/lodash-es": "^4.17.12",
     "@vitejs/plugin-vue": "^5.2.0",
     "autoprefixer": "^10.4.21",
     "glob": "^10.0.0",
@@ -31,6 +38,8 @@
     "vue": "^3.5.13"
   },
   "dependencies": {
-    "esbuild": "^0.25.5"
+    "esbuild": "^0.25.5",
+    "lodash-es": "^4.17.21",
+    "vue-router": "^4.5.1"
   }
 }
