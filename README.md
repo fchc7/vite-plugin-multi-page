@@ -211,6 +211,8 @@ export default defineConfig({
 - **`strategy`**: 按策略分组，如 `/dist/mobile/page1.html`、`/dist/desktop/page1.html`
 - **`page`**: 按页面分组，如 `/dist/homePage/index.html`、`/dist/aboutPage/index.html`
 
+> **注意**: 使用 `strategy` 或 `page` 模式时，`public/` 目录中的静态资源会自动复制到每个子目录中，确保资源路径正确。
+
 ### 页面策略分配
 
 通过 `pageConfigs` 函数为页面分配策略:

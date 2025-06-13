@@ -7,6 +7,7 @@ import { generateBuildConfig } from './build-config';
 import { loadUserConfig, hasCustomConfig } from './config-loader';
 import { mergeWithDefaults } from './defaults';
 import type { Options, ConfigTransformFunction } from './types';
+import * as glob from 'glob';
 
 // 导出类型和工具函数
 export { defineConfig, defineConfigTransform } from './types';
@@ -41,7 +42,18 @@ function reorganizeAssets(
     .map(file => path.resolve(distDir, file));
 
   if (htmlFiles.length === 0) {
-    log('未找到HTML文件，跳过重组');
+    log('未找到HTML文件，但仍需清理assets目录');
+
+    // 即使没有HTML文件，在strategy/page模式下也要清理空的assets目录
+    if ((mode === 'strategy' || mode === 'page') && fs.existsSync(assetsDir)) {
+      try {
+        fs.rmSync(assetsDir, { recursive: true, force: true });
+        log('强制清理整个根目录assets目录 (strategy/page模式)');
+      } catch (error) {
+        log('清理根目录assets失败:', error);
+      }
+    }
+
     return;
   }
 
@@ -89,6 +101,19 @@ function reorganizeAssets(
     log(`页面 ${fileName} 依赖资源:`, assets);
   });
 
+  // 添加public目录资源处理
+  log('第一阶段补充：分析public目录资源');
+  const publicAssets = new Set<string>();
+  const publicDir = path.resolve(process.cwd(), 'public');
+
+  if (fs.existsSync(publicDir)) {
+    const publicFiles = glob.sync('**/*', { cwd: publicDir, nodir: true });
+    for (const file of publicFiles) {
+      publicAssets.add(file);
+      log(`发现public资源: ${file}`);
+    }
+  }
+
   // 第二阶段：识别共享资源
   allAssetUsage.forEach((users, assetFile) => {
     if (users.length > 1) {
@@ -121,6 +146,30 @@ function reorganizeAssets(
       }
     });
   });
+
+  log('第三阶段补充：处理public目录资源');
+  // 在每个策略/页面目录中创建public资源的副本
+  const uniqueTargetDirs = new Set<string>();
+  bundleInfo.forEach(({ targetDir }) => {
+    uniqueTargetDirs.add(targetDir);
+  });
+
+  for (const targetDir of uniqueTargetDirs) {
+    for (const publicAsset of publicAssets) {
+      const sourceFile = path.resolve(distDir, publicAsset);
+      const targetFile = path.resolve(targetDir, publicAsset);
+
+      if (fs.existsSync(sourceFile)) {
+        const targetAssetDir = path.dirname(targetFile);
+        if (!fs.existsSync(targetAssetDir)) {
+          fs.mkdirSync(targetAssetDir, { recursive: true });
+        }
+
+        fs.copyFileSync(sourceFile, targetFile);
+        log(`复制public资源: ${publicAsset} -> ${path.relative(distDir, targetFile)}`);
+      }
+    }
+  }
 
   // 第四阶段：移动HTML文件并更新资源引用
   bundleInfo.forEach(({ targetDir }, pageName) => {
@@ -199,6 +248,44 @@ function reorganizeAssets(
         log('assets目录中还有未处理的文件:', finalRemainingFiles);
       }
     }
+  }
+
+  // 第五阶段补充：清理根目录的public资源（在strategy/page模式下）
+  if ((mode === 'strategy' || mode === 'page') && publicAssets.size > 0) {
+    log('第五阶段补充：清理根目录的public资源');
+    publicAssets.forEach(publicAsset => {
+      const rootPublicFile = path.resolve(distDir, publicAsset);
+      if (fs.existsSync(rootPublicFile)) {
+        try {
+          fs.unlinkSync(rootPublicFile);
+          log(`删除根目录public资源: ${publicAsset}`);
+        } catch (error) {
+          log(`删除根目录public资源失败: ${publicAsset}`, error);
+        }
+      }
+    });
+
+    // 尝试删除空的public相关目录结构
+    publicAssets.forEach(publicAsset => {
+      const rootPublicFile = path.resolve(distDir, publicAsset);
+      let parentDir = path.dirname(rootPublicFile);
+
+      // 逐级向上检查并删除空目录，直到dist根目录
+      while (parentDir !== distDir && parentDir !== path.dirname(parentDir)) {
+        try {
+          if (fs.existsSync(parentDir) && fs.readdirSync(parentDir).length === 0) {
+            fs.rmdirSync(parentDir);
+            log(`删除空目录: ${path.relative(distDir, parentDir)}`);
+            parentDir = path.dirname(parentDir);
+          } else {
+            break; // 目录不空或不存在，停止向上检查
+          }
+        } catch (error) {
+          // 忽略删除目录失败的错误，可能是权限问题或目录不空
+          break;
+        }
+      }
+    });
   }
 }
 

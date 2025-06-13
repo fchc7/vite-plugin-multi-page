@@ -211,6 +211,8 @@ export default defineConfig({
 - **`strategy`**: Group by strategy, e.g., `/dist/mobile/page1.html`, `/dist/desktop/page1.html`
 - **`page`**: Group by page, e.g., `/dist/homePage/index.html`, `/dist/aboutPage/index.html`
 
+> **Note**: When using `strategy` or `page` mode, static assets from the `public/` directory are automatically copied to each subdirectory to ensure correct asset paths.
+
 ### Page Strategy Assignment
 
 Assign strategies to pages through the `pageConfigs` function:
