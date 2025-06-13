@@ -52,7 +52,7 @@
     "pre-release": "bash scripts/pre-release-check.sh",
     "prepack": "pnpm run clean && pnpm run type-check && pnpm run lint && pnpm run format:check && pnpm run build",
     "prepublishOnly": "pnpm run prepack",
-    "postpublish": "git push && git push --tags",
+    "postpublish": "if [ -n \"$CI\" ]; then echo 'Skipping git push in CI environment'; else git push && git push --tags; fi",
     "version:patch": "npm version patch",
     "version:minor": "npm version minor",
     "version:major": "npm version major",
