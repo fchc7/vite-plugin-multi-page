@@ -7,6 +7,7 @@ export interface MultiPageOptions {
   template?: string;
   placeholder?: string;
   debug?: boolean;
+  merge?: 'all' | 'strategy' | 'page'; // 构建产物合并模式
   strategies?: Record<string, ConfigStrategy>;
   pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
   __forceBuildStrategy?: string;
@@ -33,6 +34,7 @@ export interface BuildConfigOptions {
   exclude: string[];
   template: string;
   placeholder: string;
+  merge?: 'all' | 'strategy' | 'page'; // 构建产物合并模式
   strategies?: Record<string, ConfigStrategy>;
   pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
   forceBuildStrategy?: string;

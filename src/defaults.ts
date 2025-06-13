@@ -9,6 +9,7 @@ export const DEFAULT_CONFIG: Required<Omit<MultiPageOptions, '__forceBuildStrate
   template: 'index.html',
   placeholder: '{{ENTRY_FILE}}',
   debug: false,
+  merge: 'all',
   strategies: {
     default: {},
   },
@@ -31,6 +32,7 @@ export function mergeWithDefaults(
     template: userConfig.template ?? DEFAULT_CONFIG.template,
     placeholder: userConfig.placeholder ?? DEFAULT_CONFIG.placeholder,
     debug: userConfig.debug ?? DEFAULT_CONFIG.debug,
+    merge: userConfig.merge ?? DEFAULT_CONFIG.merge,
     strategies: userConfig.strategies ?? DEFAULT_CONFIG.strategies,
     pageConfigs: userConfig.pageConfigs ?? DEFAULT_CONFIG.pageConfigs,
     __forceBuildStrategy: userConfig.__forceBuildStrategy,

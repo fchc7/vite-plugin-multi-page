@@ -14,7 +14,6 @@ export default defineConfig([
       // 设置所有依赖为外部依赖
       'vite',
       'glob',
-      'esbuild',
       'cac',
       // Node.js 内置模块
       'node:fs',
@@ -76,7 +75,6 @@ module.exports.mergeWithDefaults = mergeWithDefaults;`
       // 设置所有依赖为外部依赖
       'vite',
       'glob',
-      'esbuild',
       'cac',
       // Node.js 内置模块
       'node:fs',

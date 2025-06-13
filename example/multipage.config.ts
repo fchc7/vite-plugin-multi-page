@@ -9,6 +9,12 @@ const config = context => {
     exclude: ['src/shared/**/*.ts'],
     debug: !isProduction || isCLI,
 
+    // 构建产物合并模式
+    // 'all' - 所有HTML文件放在根目录 (默认)
+    // 'strategy' - 按策略分组，如: /dist/mobile/page1.html
+    // 'page' - 按页面分组，如: /dist/homePage/index.html
+    merge: 'page',
+
     strategies: {
       default: {
         // 默认策略配置

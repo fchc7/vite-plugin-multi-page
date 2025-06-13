@@ -189,10 +189,28 @@ function buildStrategy(
 /**
  * 合并构建结果
  */
-async function mergeResults(results: BuildResult[], debug: boolean): Promise<void> {
+async function mergeResults(results: BuildResult[], options: any, debug: boolean): Promise<void> {
   const log = debug ? console.log.bind(console, '[merge]') : () => {};
 
   log('开始合并构建结果...');
+
+  const mergeMode = options.merge || 'all';
+  log(`使用合并模式: ${mergeMode}`);
+
+  if (mergeMode === 'all') {
+    // 默认模式：所有HTML文件放在根目录，assets合并
+    await mergeResultsAll(results, debug);
+  } else {
+    // strategy 或 page 模式：使用插件的资源重组逻辑
+    await mergeResultsWithReorganization(results, options, debug);
+  }
+}
+
+/**
+ * 默认合并模式：所有HTML文件放在根目录
+ */
+async function mergeResultsAll(results: BuildResult[], debug: boolean): Promise<void> {
+  const log = debug ? console.log.bind(console, '[merge]') : () => {};
 
   const distDir = path.resolve(process.cwd(), 'dist');
   const assetsDir = path.resolve(distDir, 'assets');
@@ -203,16 +221,9 @@ async function mergeResults(results: BuildResult[], debug: boolean): Promise<voi
   }
 
   const htmlFiles: string[] = [];
-  const strategyInfo: Array<{ strategy: string; success: boolean; error?: string }> = [];
 
   // 处理每个策略的构建结果
   for (const result of results) {
-    strategyInfo.push({
-      strategy: result.strategy,
-      success: result.success,
-      error: result.error,
-    });
-
     if (!result.success) continue;
 
     const sourceDir = path.resolve(distDir, result.strategy);
@@ -303,6 +314,36 @@ async function mergeResults(results: BuildResult[], debug: boolean): Promise<voi
 }
 
 /**
+ * 高级合并模式：使用资源重组逻辑
+ */
+async function mergeResultsWithReorganization(
+  results: BuildResult[],
+  options: any,
+  debug: boolean
+): Promise<void> {
+  const log = debug ? console.log.bind(console, '[merge]') : () => {};
+
+  // 首先使用默认方式合并到根目录
+  await mergeResultsAll(results, debug);
+
+  // 然后应用重组逻辑
+  const distDir = path.resolve(process.cwd(), 'dist');
+  const mergeMode = options.merge as 'strategy' | 'page';
+
+  log(`应用${mergeMode}模式的资源重组...`);
+
+  try {
+    // 引入重组函数
+    const { reorganizeAssetsInCLI } = await import('./index');
+    await reorganizeAssetsInCLI(distDir, mergeMode, options, log);
+    log(`✅ ${mergeMode}模式资源重组完成`);
+  } catch (error) {
+    log('资源重组失败:', error);
+    throw error;
+  }
+}
+
+/**
  * 清理临时HTML文件
  */
 async function cleanupTempFiles(debug: boolean): Promise<void> {
@@ -333,10 +374,12 @@ async function cleanupTempFiles(debug: boolean): Promise<void> {
 /**
  * 清理临时文件
  */
-async function cleanup(strategies: string[], debug: boolean): Promise<void> {
+async function cleanup(strategies: string[], options: any, debug: boolean): Promise<void> {
   const log = debug ? console.log.bind(console, '[cleanup]') : () => {};
 
   log('清理临时文件...');
+
+  const mergeMode = options.merge || 'all';
 
   // 1. 清理项目根目录中的临时HTML文件
   const rootTempFiles = glob.sync('.temp.mp.*.html', { cwd: process.cwd() });
@@ -367,18 +410,22 @@ async function cleanup(strategies: string[], debug: boolean): Promise<void> {
     }
   }
 
-  // 3. 清理策略目录（在合并完成后）
-  const distDir = path.resolve(process.cwd(), 'dist');
-  for (const strategy of strategies) {
-    const strategyDir = path.resolve(distDir, strategy);
-    if (fs.existsSync(strategyDir)) {
-      try {
-        fs.rmSync(strategyDir, { recursive: true, force: true });
-        log(`删除策略目录: ${strategy}`);
-      } catch (error) {
-        log(`删除策略目录失败: ${strategy}`, error);
+  // 3. 清理策略目录（在 merge='all' 模式下才删除）
+  if (mergeMode === 'all') {
+    const distDir = path.resolve(process.cwd(), 'dist');
+    for (const strategy of strategies) {
+      const strategyDir = path.resolve(distDir, strategy);
+      if (fs.existsSync(strategyDir)) {
+        try {
+          fs.rmSync(strategyDir, { recursive: true, force: true });
+          log(`删除策略目录: ${strategy}`);
+        } catch (error) {
+          log(`删除策略目录失败: ${strategy}`, error);
+        }
       }
     }
+  } else {
+    log(`保留策略目录 (merge模式: ${mergeMode})`);
   }
 
   log('✅ 清理完成');
@@ -475,10 +522,10 @@ async function main(): Promise<void> {
 
     // 5. 合并构建结果
     log('📦 合并构建结果...');
-    await mergeResults(results, debug);
+    await mergeResults(results, options, debug);
 
     // 6. 清理临时文件和策略目录
-    await cleanup(strategies, debug);
+    await cleanup(strategies, options, debug);
 
     // 收集构建结果信息
     const successfulResults = results.filter(r => r.success);

@@ -77,19 +77,48 @@ export function configureDevServer(
 
         // 跳过明显的静态资源请求
         if (
-          pathWithoutQuery.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/) &&
+          pathWithoutQuery.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map)$/) &&
           !pathWithoutQuery.endsWith('.html')
         ) {
           return next();
         }
 
-        // 提取页面名称，同时处理带.html后缀和不带后缀的情况
+        // 跳过以@开头的特殊路径（如Vite的特殊路径）
+        if (pathWithoutQuery.startsWith('/@')) {
+          return next();
+        }
+
+        // 跳过 __vite_ping 和其他 Vite 内部路径
+        if (pathWithoutQuery.includes('__vite') || pathWithoutQuery.startsWith('/node_modules')) {
+          return next();
+        }
+
+        // 提取页面名称，支持 history 路由
         let pageName = '';
+
+        // 1. 处理带 .html 后缀的请求
         if (pathWithoutQuery.endsWith('.html')) {
           pageName = path.basename(pathWithoutQuery, '.html');
-        } else if (pathWithoutQuery.startsWith('/')) {
-          // 处理无扩展名的路径，如 /mobile
-          pageName = pathWithoutQuery.substring(1); // 移除开头的斜杠
+        }
+        // 2. 处理精确匹配的页面路径，如 /mobile
+        else if (pathWithoutQuery.startsWith('/')) {
+          const cleanPath = pathWithoutQuery.substring(1); // 移除开头的斜杠
+
+          // 首先尝试精确匹配
+          if (entryFiles.find(file => file.name === cleanPath)) {
+            pageName = cleanPath;
+          }
+          // 然后尝试 history 路由匹配，如 /home/login -> home
+          else {
+            const segments = cleanPath.split('/');
+            if (segments.length > 1) {
+              const possiblePageName = segments[0];
+              if (entryFiles.find(file => file.name === possiblePageName)) {
+                pageName = possiblePageName;
+                log(`History 路由匹配: ${pathWithoutQuery} -> ${possiblePageName}`);
+              }
+            }
+          }
         }
 
         if (!pageName) {

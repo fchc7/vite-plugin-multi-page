@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { Plugin } from 'vite';
 import { mergeConfig } from 'vite';
 import { setupDevMiddleware } from './dev-server';
@@ -16,6 +17,190 @@ export type {
   PageContext,
   PageConfig,
 } from './types';
+
+/**
+ * 重组构建产物，实现不同的merge模式
+ */
+function reorganizeAssets(
+  distDir: string,
+  mode: 'strategy' | 'page',
+  options: Options,
+  log: (...args: any[]) => void
+) {
+  const assetsDir = path.resolve(distDir, 'assets');
+
+  if (!fs.existsSync(assetsDir)) {
+    log('assets目录不存在，跳过重组');
+    return;
+  }
+
+  // 分析所有HTML文件和它们的资源依赖
+  const htmlFiles = fs
+    .readdirSync(distDir)
+    .filter(file => file.endsWith('.html'))
+    .map(file => path.resolve(distDir, file));
+
+  if (htmlFiles.length === 0) {
+    log('未找到HTML文件，跳过重组');
+    return;
+  }
+
+  const bundleInfo = new Map<string, { assets: string[]; targetDir: string; strategy?: string }>();
+  const allAssetUsage = new Map<string, string[]>(); // 记录每个资源被哪些页面使用
+
+  // 第一阶段：分析每个页面的资源依赖
+  htmlFiles.forEach(htmlFile => {
+    let fileName = path.basename(htmlFile, '.html');
+
+    // 如果是临时文件名，提取真实的页面名
+    if (fileName.startsWith('.temp.mp.')) {
+      fileName = fileName.replace('.temp.mp.', '');
+    }
+
+    const htmlContent = fs.readFileSync(htmlFile, 'utf-8');
+    const assets: string[] = [];
+
+    // 匹配 src 和 href 属性中的 /assets/ 路径
+    const assetRegex = /(?:src|href)="\/assets\/([^"]+)"/g;
+    let match;
+
+    while ((match = assetRegex.exec(htmlContent)) !== null) {
+      const assetFile = match[1];
+      assets.push(assetFile);
+
+      // 记录这个资源被哪些页面使用
+      if (!allAssetUsage.has(assetFile)) {
+        allAssetUsage.set(assetFile, []);
+      }
+      allAssetUsage.get(assetFile)!.push(fileName);
+    }
+
+    // 确定目标目录
+    let targetSubDir = '';
+    if (mode === 'strategy') {
+      // 这里需要从配置中推断策略，暂时使用页面名
+      targetSubDir = 'default'; // 可以基于页面配置推断
+    } else if (mode === 'page') {
+      targetSubDir = fileName;
+    }
+
+    const targetDir = path.resolve(distDir, targetSubDir);
+    bundleInfo.set(fileName, { assets, targetDir });
+    log(`页面 ${fileName} 依赖资源:`, assets);
+  });
+
+  // 第二阶段：识别共享资源
+  allAssetUsage.forEach((users, assetFile) => {
+    if (users.length > 1) {
+      log(`共享资源 ${assetFile} 被页面使用:`, users);
+    } else {
+      log(`独占资源 ${assetFile} 仅被页面 ${users[0]} 使用`);
+    }
+  });
+
+  // 第三阶段：复制资源文件到各个页面目录
+  bundleInfo.forEach(({ assets, targetDir }, pageName) => {
+    // 创建目标目录和assets子目录
+    const pageAssetsDir = path.resolve(targetDir, 'assets');
+    if (!fs.existsSync(pageAssetsDir)) {
+      fs.mkdirSync(pageAssetsDir, { recursive: true });
+    }
+
+    // 复制该页面需要的所有资源文件
+    assets.forEach(assetFile => {
+      const sourcePath = path.resolve(assetsDir, assetFile);
+      const targetPath = path.resolve(pageAssetsDir, assetFile);
+
+      if (fs.existsSync(sourcePath)) {
+        fs.copyFileSync(sourcePath, targetPath);
+        log(
+          `复制资源文件到 ${pageName}: assets/${assetFile} -> ${path.relative(distDir, targetPath)}`
+        );
+      } else {
+        log(`警告: 资源文件不存在: ${sourcePath}`);
+      }
+    });
+  });
+
+  // 第四阶段：移动HTML文件并更新资源引用
+  bundleInfo.forEach(({ targetDir }, pageName) => {
+    // 查找实际的HTML文件（可能是临时文件名或正常文件名）
+    let originalHtmlPath = path.resolve(distDir, `${pageName}.html`);
+    let actualPageName = pageName;
+
+    // 如果正常文件名不存在，尝试临时文件名
+    if (!fs.existsSync(originalHtmlPath)) {
+      originalHtmlPath = path.resolve(distDir, `.temp.mp.${pageName}.html`);
+      // 从临时文件名中提取页面名
+      if (fs.existsSync(originalHtmlPath)) {
+        actualPageName = pageName; // 保持原页面名
+      }
+    }
+
+    if (fs.existsSync(originalHtmlPath)) {
+      let htmlContent = fs.readFileSync(originalHtmlPath, 'utf-8');
+
+      // 更新资源引用路径：/assets/ -> ./assets/
+      htmlContent = htmlContent.replace(/(?:src|href)="\/assets\//g, match => {
+        return match.replace('/assets/', './assets/');
+      });
+
+      // 确定最终的HTML文件路径（使用正常的文件名）
+      let finalHtmlPath: string;
+      if (mode === 'strategy') {
+        finalHtmlPath = path.resolve(targetDir, `${actualPageName}.html`);
+      } else if (mode === 'page') {
+        finalHtmlPath = path.resolve(targetDir, 'index.html');
+      } else {
+        finalHtmlPath = originalHtmlPath;
+      }
+
+      // 写入更新后的HTML文件
+      fs.writeFileSync(finalHtmlPath, htmlContent);
+
+      // 删除原始文件（如果位置发生了变化）
+      if (finalHtmlPath !== originalHtmlPath) {
+        fs.unlinkSync(originalHtmlPath);
+      }
+
+      const relativePath = path.relative(distDir, finalHtmlPath);
+      log(`按${mode}分组移动HTML文件: ${actualPageName}.html -> ${relativePath}`);
+    } else {
+      log(`警告: 未找到HTML文件: ${pageName}.html 或 .temp.mp.${pageName}.html`);
+    }
+  });
+
+  // 第五阶段：清理原始assets目录
+  if (fs.existsSync(assetsDir)) {
+    // 在strategy或page模式下，强制清理整个根目录assets（因为资源已经复制到各个策略目录）
+    if (mode === 'strategy' || mode === 'page') {
+      try {
+        fs.rmSync(assetsDir, { recursive: true, force: true });
+        log('强制清理整个根目录assets目录 (strategy/page模式)');
+      } catch (error) {
+        log('清理根目录assets失败:', error);
+      }
+    } else {
+      // 默认模式：只删除已处理的资源文件
+      allAssetUsage.forEach((users, assetFile) => {
+        const originalPath = path.resolve(assetsDir, assetFile);
+        if (fs.existsSync(originalPath)) {
+          fs.unlinkSync(originalPath);
+          log(`清理原始资源文件: assets/${assetFile}`);
+        }
+      });
+
+      // 如果assets目录为空则删除
+      const finalRemainingFiles = fs.readdirSync(assetsDir);
+      if (finalRemainingFiles.length === 0) {
+        fs.rmdirSync(assetsDir);
+        log('清理空的assets目录');
+      } else {
+        log('assets目录中还有未处理的文件:', finalRemainingFiles);
+      }
+    }
+  }
+}
 
 export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
   let resolvedOptions: Options;
@@ -125,6 +310,7 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
           exclude: resolvedOptions.exclude || [],
           template: resolvedOptions.template || 'index.html',
           placeholder: resolvedOptions.placeholder || '{{ENTRY_FILE}}',
+          merge: resolvedOptions.merge || 'all',
           strategies: resolvedOptions.strategies || {},
           pageConfigs: resolvedOptions.pageConfigs || {},
           forceBuildStrategy,
@@ -197,6 +383,27 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
       }
     },
 
+    writeBundle(options: any) {
+      // 只在构建模式下处理merge功能
+      if (!resolvedOptions?.merge || resolvedOptions.merge === 'all') {
+        // 默认模式：所有文件保持在根目录
+        return;
+      }
+
+      const distDir = options.dir || 'dist';
+      const merge = resolvedOptions.merge;
+
+      log(`应用构建产物合并模式: ${merge}`);
+
+      try {
+        // 执行资源重组
+        reorganizeAssets(distDir, merge, resolvedOptions, log);
+      } catch (error) {
+        log('资源重组失败:', error);
+        throw error;
+      }
+    },
+
     buildEnd() {
       // 清理临时文件
       if (tempFiles.length > 0) {
@@ -215,6 +422,18 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
       }
     },
   };
+}
+
+/**
+ * CLI工具专用的资源重组函数
+ */
+export function reorganizeAssetsInCLI(
+  distDir: string,
+  mode: 'strategy' | 'page',
+  options: Options,
+  log: (...args: any[]) => void
+): void {
+  return reorganizeAssets(distDir, mode, options, log);
 }
 
 export default viteMultiPage;

@@ -72,8 +72,28 @@ async function loadConfigFile(filePath: string): Promise<any> {
     try {
       const code = await fs.promises.readFile(filePath, 'utf-8');
 
+      // 尝试动态导入 esbuild
+      let esbuild: any;
+      try {
+        esbuild = await import('esbuild');
+      } catch (importError) {
+        // esbuild 不可用，给出友好的错误提示
+        console.error('\n❌ 无法加载 TypeScript 配置文件，因为找不到 esbuild 依赖。');
+        console.error('\n💡 请选择以下解决方案之一：');
+        console.error(
+          '   1. 安装 esbuild (peerDependency)：npm install esbuild@">=0.19.3" --save-dev'
+        );
+        console.error('   2. 或者如果使用 Vite 项目，esbuild 通常已安装，请检查版本是否 >=0.19.3');
+        console.error(
+          '   3. 使用 JavaScript 配置文件：将 multipage.config.ts 重命名为 multipage.config.js'
+        );
+        console.error(
+          '   4. 使用 ESM 配置文件：将 multipage.config.ts 重命名为 multipage.config.mjs\n'
+        );
+        throw new Error(`需要 esbuild 依赖来处理 TypeScript 配置文件: ${path.basename(filePath)}`);
+      }
+
       // 使用 esbuild 实时转译 TS → JS
-      const esbuild = (await import('esbuild')) as any;
       const result = await esbuild.transform(code, {
         loader: 'ts',
         format: 'cjs', // 使用 CommonJS 格式便于使用 Module._compile
@@ -90,8 +110,13 @@ async function loadConfigFile(filePath: string): Promise<any> {
       (tempModule as any)._compile(result.code, filePath);
 
       return tempModule.exports;
-    } catch (esbuildError) {
-      console.warn('esbuild 转译失败，尝试简单转换:', esbuildError);
+    } catch (error) {
+      // 如果是 esbuild 缺失的错误，直接抛出
+      if (error instanceof Error && error.message.includes('需要 esbuild 依赖')) {
+        throw error;
+      }
+
+      console.warn('esbuild 转译失败，尝试简单转换:', error);
 
       // 备选方案：简单的文本替换
       const code = await fs.promises.readFile(filePath, 'utf-8');
