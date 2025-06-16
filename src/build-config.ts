@@ -21,6 +21,7 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
     strategies = {},
     pageConfigs = {},
     forceBuildStrategy,
+    forceBuildPage,
   } = options;
 
   const log = createLogger(true);
@@ -61,7 +62,36 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
 
     log(`📄 发现 ${entryFiles.length} 个页面: ${entryFiles.map(f => f.name).join(', ')}`);
 
-    // 3. 如果指定了强制策略，只构建该策略的页面
+    // 3. 如果指定了强制页面，只构建该页面
+    if (forceBuildPage) {
+      const targetEntry = entryFiles.find(f => f.name === forceBuildPage);
+      if (!targetEntry) {
+        log(`警告: 未找到页面 "${forceBuildPage}"`);
+        return {};
+      }
+
+      log(`强制构建页面: ${forceBuildPage}`);
+
+      // 获取该页面的策略
+      const pageStrategy = pageStrategies.get(forceBuildPage) || 'default';
+      const strategyConfig = strategies[pageStrategy] || {};
+
+      const config = generateStrategyConfig(
+        `single-${forceBuildPage}`,
+        [forceBuildPage],
+        entryFiles,
+        strategyConfig,
+        pageConfigs,
+        template,
+        placeholder,
+        log
+      );
+
+      buildConfigs[`single-${forceBuildPage}`] = config;
+      return buildConfigs;
+    }
+
+    // 4. 如果指定了强制策略，只构建该策略的页面
     if (forceBuildStrategy) {
       const targetPages = strategyPages.get(forceBuildStrategy) || [];
       if (targetPages.length === 0) {
@@ -86,7 +116,7 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
       return buildConfigs;
     }
 
-    // 4. 为每个策略生成构建配置
+    // 5. 为每个策略生成构建配置
     for (const [strategyName, pages] of strategyPages) {
       if (pages.length === 0) continue;
 
@@ -220,183 +250,9 @@ function generateStrategyConfig(
       rollupOptions: {
         input: htmlInputs, // 使用临时HTML文件作为输入
         output: {
-          entryFileNames: chunkInfo => {
-            // 为入口文件添加页面前缀：mp[pageName]-[name]-[hash].js
-            const pageName = pages.find(p => chunkInfo.name === p);
-            if (pageName) {
-              return `assets/mp${pageName}-[name]-[hash].js`;
-            }
-            return 'assets/[name]-[hash].js';
-          },
-          chunkFileNames: chunkInfo => {
-            // 为懒加载chunk添加页面前缀
-            // 通过分析chunk的facadeModuleId来确定属于哪个页面
-            if (chunkInfo.facadeModuleId) {
-              for (const pageName of pages) {
-                const entryFile = entryFiles.find(f => f.name === pageName);
-                if (
-                  entryFile &&
-                  chunkInfo.facadeModuleId.includes(entryFile.file.replace(/\\/g, '/'))
-                ) {
-                  return `assets/mp${pageName}-[name]-[hash].js`;
-                }
-                // 检查是否是该页面的组件文件
-                if (
-                  chunkInfo.facadeModuleId.includes(`/pages/${pageName}/`) ||
-                  chunkInfo.facadeModuleId.includes(`\\pages\\${pageName}\\`)
-                ) {
-                  return `assets/mp${pageName}-[name]-[hash].js`;
-                }
-              }
-            }
-
-            // 检查chunk的模块导入关系来确定页面归属
-            if (chunkInfo.moduleIds) {
-              for (const moduleId of chunkInfo.moduleIds) {
-                for (const pageName of pages) {
-                  if (
-                    moduleId.includes(`/pages/${pageName}/`) ||
-                    moduleId.includes(`\\pages\\${pageName}\\`)
-                  ) {
-                    return `assets/mp${pageName}-[name]-[hash].js`;
-                  }
-                }
-              }
-            }
-
-            // 通过chunk名称和模块关系来推断页面归属 - 特别针对第三方库
-            // 检查是否是知名的第三方库，如果是，尝试分配给最可能使用它的页面
-            const chunkName = chunkInfo.name || '';
-
-            // 对于lodash等第三方库，检查哪个页面最有可能使用它
-            if (
-              chunkName.includes('lodash') ||
-              chunkName.includes('vendor') ||
-              !chunkInfo.facadeModuleId ||
-              chunkInfo.facadeModuleId.includes('node_modules')
-            ) {
-              // 检查所有模块ID中是否有页面相关的引用
-              const allModules = [...(chunkInfo.moduleIds || [])];
-              if (chunkInfo.facadeModuleId) {
-                allModules.push(chunkInfo.facadeModuleId);
-              }
-
-              // 寻找最匹配的页面
-              for (const pageName of pages) {
-                for (const moduleId of allModules) {
-                  if (
-                    moduleId.includes(`/pages/${pageName}/`) ||
-                    moduleId.includes(`\\pages\\${pageName}\\`)
-                  ) {
-                    return `assets/mp${pageName}-[name]-[hash].js`;
-                  }
-                }
-              }
-
-              // 如果无法确定归属，但是chunk名中包含了页面信息，就使用它
-              for (const pageName of pages) {
-                if (chunkName.toLowerCase().includes(pageName.toLowerCase())) {
-                  return `assets/mp${pageName}-[name]-[hash].js`;
-                }
-              }
-
-              // 对于SPA页面，特殊处理：如果是第三方库且无法确定归属，默认分配给spa页面
-              if (
-                pages.includes('spa') &&
-                (chunkName.includes('lodash') ||
-                  chunkName.includes('vendor') ||
-                  chunkInfo.facadeModuleId?.includes('node_modules'))
-              ) {
-                return `assets/mpspa-[name]-[hash].js`;
-              }
-            }
-
-            return 'assets/[name]-[hash].js';
-          },
-          assetFileNames: assetInfo => {
-            // 为CSS等资源文件添加页面前缀
-            if (assetInfo.name) {
-              // 1. 检查资源文件名是否包含页面信息
-              for (const pageName of pages) {
-                if (assetInfo.name.includes(pageName)) {
-                  return `assets/mp${pageName}-[name]-[hash][extname]`;
-                }
-              }
-
-              // 2. 检查资源源码路径是否包含页面信息
-              if (assetInfo.source && typeof assetInfo.source === 'string') {
-                for (const pageName of pages) {
-                  if (assetInfo.source.includes(`pages/${pageName}/`)) {
-                    return `assets/mp${pageName}-[name]-[hash][extname]`;
-                  }
-                }
-              }
-
-              // 3. 检查originalFileName来推断页面归属（新的Rollup 4.20.0+ 特性）
-              if ((assetInfo as any).originalFileName) {
-                for (const pageName of pages) {
-                  if (
-                    (assetInfo as any).originalFileName.includes(`/pages/${pageName}/`) ||
-                    (assetInfo as any).originalFileName.includes(`\\pages\\${pageName}\\`)
-                  ) {
-                    return `assets/mp${pageName}-[name]-[hash][extname]`;
-                  }
-                }
-              }
-
-              // 4. 特殊处理：通过当前构建的入口文件来推断页面归属
-              // 对于在pages根目录的共享资源，尝试分配给引用它的页面
-              if (
-                assetInfo.name === 'ttt' ||
-                assetInfo.name === 'test-styles' ||
-                assetInfo.name.startsWith('test-styles')
-              ) {
-                // 这些是在pages根目录的CSS文件，需要根据实际引用情况分配
-                // 查看当前处理的是哪个页面的构建
-
-                // 尝试从当前HTML输入中推断正在处理的页面
-                const currentHtmlInputs = Object.keys(htmlInputs);
-                for (const pageName of pages) {
-                  if (currentHtmlInputs.some(input => input === pageName)) {
-                    // 如果这是一个页面相关的构建，将共享资源分配给主要使用它的页面
-                    if (assetInfo.name === 'ttt' && pageName === 'mobile') {
-                      return `assets/mp${pageName}-[name]-[hash][extname]`;
-                    }
-                    if (
-                      (assetInfo.name === 'test-styles' ||
-                        assetInfo.name.startsWith('test-styles')) &&
-                      (pageName === 'mobile' || pageName === 'home')
-                    ) {
-                      return `assets/mp${pageName}-[name]-[hash][extname]`;
-                    }
-                  }
-                }
-
-                // 如果无法确定具体页面，默认分配给mobile（因为main.ts中import了这些文件）
-                if (assetInfo.name === 'ttt') {
-                  return `assets/mpmobile-[name]-[hash][extname]`;
-                }
-                if (assetInfo.name === 'test-styles' || assetInfo.name.startsWith('test-styles')) {
-                  return `assets/mpmobile-[name]-[hash][extname]`;
-                }
-              }
-
-              // 5. 尝试通过CSS内容推断页面归属
-              if (typeof assetInfo.source === 'string' && assetInfo.source.length > 0) {
-                // 检查CSS内容中是否包含页面特定的类名或关键词
-                for (const pageName of pages) {
-                  if (
-                    assetInfo.source.includes(`${pageName}-`) ||
-                    assetInfo.source.includes(`.${pageName}`) ||
-                    assetInfo.source.includes(`/* ${pageName}`)
-                  ) {
-                    return `assets/mp${pageName}-[name]-[hash][extname]`;
-                  }
-                }
-              }
-            }
-            return 'assets/[name]-[hash][extname]';
-          },
+          entryFileNames: 'assets/[name]-[hash].js',
+          chunkFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash][extname]',
         },
       },
       emptyOutDir: false, // 不清空输出目录，避免删除临时HTML文件
@@ -479,6 +335,23 @@ export function cleanViteOutputDirectory(viteBuildArgs: string[] = []): void {
 /**
  * 获取所有可用的构建策略
  */
+export function discoverPages(options: BuildConfigOptions): Array<{ name: string; file: string }> {
+  const { entry = 'src/pages/*/main.{ts,js}', exclude = [] } = options;
+
+  const log = createLogger(true);
+
+  try {
+    // 发现所有页面入口文件
+    const allFiles = glob.sync(entry, { cwd: process.cwd() });
+    const entryFiles = filterEntryFiles(allFiles, entry, exclude, log);
+
+    return entryFiles;
+  } catch (error) {
+    log('发现页面失败:', error);
+    throw error;
+  }
+}
+
 export function getAvailableStrategies(options: BuildConfigOptions): string[] {
   const { entry = 'src/pages/*/main.{ts,js}', exclude = [], pageConfigs = {} } = options;
 

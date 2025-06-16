@@ -203,15 +203,60 @@ strategies: {
 ```typescript
 export default defineConfig({
   // ... 其他配置
-  merge: 'all' | 'strategy' | 'page',
+  merge: 'all' | 'page',
 });
 ```
 
-- **`all`** (默认): 所有HTML文件放在根目录，资源合并到 `/dist/assets/`
-- **`strategy`**: 按策略分组，如 `/dist/mobile/page1.html`、`/dist/desktop/page1.html`
-- **`page`**: 按页面分组，如 `/dist/homePage/index.html`、`/dist/aboutPage/index.html`
+#### 可用模式
 
-> **注意**: 使用 `strategy` 或 `page` 模式时，`public/` 目录中的静态资源会自动复制到每个子目录中，确保资源路径正确。
+- **`all`** (默认): 所有HTML文件放在根目录，资源合并到 `/dist/assets/`
+
+  ```
+  dist/
+  ├── home.html
+  ├── about.html
+  ├── mobile.html
+  └── assets/
+      ├── home-xxx.js
+      ├── about-xxx.js
+      └── shared-resource.svg
+  ```
+
+- **`page`**: 每个页面独立打包，各自拥有完整的资源副本
+  ```
+  dist/
+  ├── home/
+  │   ├── index.html
+  │   ├── assets/
+  │   │   ├── home-xxx.js
+  │   │   └── button-loading.svg
+  │   └── images/
+  ├── about/
+  │   ├── index.html
+  │   ├── assets/
+  │   │   ├── about-xxx.js
+  │   │   └── button-loading.svg
+  │   └── images/
+  └── mobile/
+      ├── index.html
+      ├── assets/
+      │   ├── mobile-xxx.js
+      │   └── button-loading.svg
+      └── images/
+  ```
+
+#### Page模式的优势
+
+- ✅ **完全独立**: 每个页面目录包含所有必需资源，可独立部署
+- ✅ **避免冲突**: 彻底解决了共享资源的归属问题
+- ✅ **简洁命名**: 资源文件使用干净的文件名，无页面前缀
+- ✅ **部署友好**: 支持CDN分发、微前端等架构模式
+
+> **注意**:
+>
+> - Page模式会为每个页面创建资源副本，可能增加总体构建产物大小
+> - 适合需要独立部署或有严格资源隔离需求的场景
+> - `public/` 目录中的静态资源会自动复制到每个页面目录中
 
 ### 页面策略分配
 
@@ -258,9 +303,64 @@ npm run dev
 npm run dev -- --strategy mobile
 ```
 
+## 使用示例
+
+### Page模式独立部署
+
+配置Page模式，每个页面获得完整的独立资源：
+
+```typescript
+// multipage.config.ts
+export default defineConfig({
+  entry: 'src/pages/**/*.{ts,js}',
+  template: 'index.html',
+  merge: 'page', // 启用Page模式
+  strategies: {
+    default: {
+      build: {
+        sourcemap: false,
+        minify: 'esbuild',
+      },
+    },
+    mobile: {
+      build: {
+        target: ['es2015'],
+        minify: 'terser',
+      },
+    },
+  },
+  pageConfigs: context => {
+    if (context.relativePath.includes('/mobile/')) {
+      return { strategy: 'mobile' };
+    }
+    return { strategy: 'default' };
+  },
+});
+```
+
+构建结果：每个页面都有独立的资源文件，避免共享资源缺失问题。
+
+### 共享资源处理
+
+在Page模式下，共享资源（如图标、样式文件）会被复制到每个页面目录：
+
+```typescript
+// src/pages/about/main.ts
+import buttonIcon from '../button-loading.svg'; // 共享资源
+
+// src/pages/mobile/main.ts
+import buttonIcon from '../button-loading.svg'; // 相同的共享资源
+```
+
+构建后两个页面都会有自己的资源副本：
+
+- `dist/about/assets/button-loading-xxx.svg`
+- `dist/mobile/assets/button-loading-xxx.svg`
+
 ## 环境变量
 
 - `VITE_BUILD_STRATEGY`: 指定单个策略构建
+- `VITE_MULTI_PAGE_BUILD_SINGLE_PAGE`: 指定单个页面构建（Page模式内部使用）
 - `IS_MOBILE`: 移动端标识 (在 define 中配置)
 - `API_BASE`: API 基础地址 (在 define 中配置)
 
@@ -293,6 +393,7 @@ export default config;
 | `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | 模板占位符       |
 | `exclude`     | `string[]`                 | `[]`                       | 排除的文件模式   |
 | `debug`       | `boolean`                  | `false`                    | 启用调试日志     |
+| `merge`       | `'all' \| 'page'`          | `'all'`                    | 构建产物合并策略 |
 | `strategies`  | `Record<string, Strategy>` | `{}`                       | 构建策略配置     |
 | `pageConfigs` | `Function \| Object`       | `{}`                       | 页面配置         |
 

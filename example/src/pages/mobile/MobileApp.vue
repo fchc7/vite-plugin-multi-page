@@ -144,7 +144,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { version } from 'vue';
 import styles from '../test-styles.module.css';
-import icon from './button-loading.svg';
+import icon from '../../button-loading.svg';
 
 // 响应式数据
 const count = ref(0);

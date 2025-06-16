@@ -89,10 +89,7 @@ function reorganizeAssets(
 
     // 确定目标目录
     let targetSubDir = '';
-    if (mode === 'strategy') {
-      // 这里需要从配置中推断策略，暂时使用页面名
-      targetSubDir = 'default'; // 可以基于页面配置推断
-    } else if (mode === 'page') {
+    if (mode === 'page') {
       targetSubDir = fileName;
     }
 
@@ -123,7 +120,7 @@ function reorganizeAssets(
     }
   });
 
-  // 第三阶段：智能匹配带前缀的资源文件并复制到对应的页面目录
+  // 第三阶段：复制每个页面需要的所有资源文件（包括共享资源）
   bundleInfo.forEach(({ assets, targetDir }, pageName) => {
     // 创建目标目录和assets子目录
     const pageAssetsDir = path.resolve(targetDir, 'assets');
@@ -131,39 +128,37 @@ function reorganizeAssets(
       fs.mkdirSync(pageAssetsDir, { recursive: true });
     }
 
-    // 复制该页面需要的所有资源文件
+    // 复制该页面需要的所有资源文件（包括共享资源）
     assets.forEach(assetFile => {
       const sourcePath = path.resolve(assetsDir, assetFile);
       const targetPath = path.resolve(pageAssetsDir, assetFile);
 
       if (fs.existsSync(sourcePath)) {
         fs.copyFileSync(sourcePath, targetPath);
+        const users = allAssetUsage.get(assetFile) || [];
+        const resourceType = users.length > 1 ? '共享资源' : '独占资源';
         log(
-          `复制资源文件到 ${pageName}: assets/${assetFile} -> ${path.relative(distDir, targetPath)}`
+          `复制${resourceType}到 ${pageName}: assets/${assetFile} -> ${path.relative(distDir, targetPath)}`
         );
       } else {
         log(`警告: 资源文件不存在: ${sourcePath}`);
       }
     });
 
-    // 第三阶段补充：查找带有页面前缀的资源文件
+    // 第三阶段补充：复制所有剩余的资源文件
     if (fs.existsSync(assetsDir)) {
       const allAssetFiles = fs.readdirSync(assetsDir);
-      const pagePrefix = `mp${pageName}-`;
 
-      // 查找属于这个页面的带前缀的文件
-      const prefixedFiles = allAssetFiles.filter(file => file.startsWith(pagePrefix));
-
-      prefixedFiles.forEach(prefixedFile => {
-        // 检查该文件是否已经在assets列表中
-        if (!assets.includes(prefixedFile)) {
-          const sourcePath = path.resolve(assetsDir, prefixedFile);
-          const targetPath = path.resolve(pageAssetsDir, prefixedFile);
+      // 复制所有不在HTML中直接引用的资源文件（如通过JS动态引入的资源）
+      allAssetFiles.forEach(assetFile => {
+        if (!assets.includes(assetFile)) {
+          const sourcePath = path.resolve(assetsDir, assetFile);
+          const targetPath = path.resolve(pageAssetsDir, assetFile);
 
           if (fs.existsSync(sourcePath)) {
             fs.copyFileSync(sourcePath, targetPath);
             log(
-              `复制前缀匹配的资源文件到 ${pageName}: assets/${prefixedFile} -> ${path.relative(distDir, targetPath)}`
+              `复制其他资源文件到 ${pageName}: assets/${assetFile} -> ${path.relative(distDir, targetPath)}`
             );
           }
         }
@@ -213,7 +208,7 @@ function reorganizeAssets(
     if (fs.existsSync(originalHtmlPath)) {
       let htmlContent = fs.readFileSync(originalHtmlPath, 'utf-8');
 
-      // 更新资源引用路径：/assets/ -> ./assets/
+      // 更新资源引用路径：所有资源都使用本地路径
       htmlContent = htmlContent.replace(/(?:src|href)="\/assets\//g, match => {
         return match.replace('/assets/', './assets/');
       });
@@ -245,7 +240,7 @@ function reorganizeAssets(
 
   // 第五阶段：清理原始assets目录
   if (fs.existsSync(assetsDir)) {
-    // 在strategy或page模式下，强制清理整个根目录assets（因为资源已经复制到各个策略目录）
+    // 在strategy或page模式下，强制清理整个根目录assets（因为资源已经复制到各个页面目录）
     if (mode === 'strategy' || mode === 'page') {
       try {
         fs.rmSync(assetsDir, { recursive: true, force: true });
@@ -414,7 +409,40 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
 
         log('配置构建模式');
 
-        // 生成构建配置
+        // 检查是否是单页面构建模式
+        const buildSinglePage = process.env.VITE_MULTI_PAGE_BUILD_SINGLE_PAGE;
+
+        if (buildSinglePage) {
+          // 单页面构建模式：只构建指定的页面
+          log(`单页面构建模式: ${buildSinglePage}`);
+
+          // 生成只包含指定页面的构建配置
+          const buildConfigs = generateBuildConfig({
+            entry: resolvedOptions.entry || 'src/pages/**/*.{ts,js}',
+            exclude: resolvedOptions.exclude || [],
+            template: resolvedOptions.template || 'index.html',
+            placeholder: resolvedOptions.placeholder || '{{ENTRY_FILE}}',
+            merge: resolvedOptions.merge || 'all',
+            strategies: resolvedOptions.strategies || {},
+            pageConfigs: resolvedOptions.pageConfigs || {},
+            forceBuildStrategy: undefined, // 不使用策略过滤
+            forceBuildPage: buildSinglePage, // 使用页面过滤
+          });
+
+          // 应用单页面构建配置
+          const configs = Object.values(buildConfigs);
+          if (configs.length > 0) {
+            const singlePageConfig = configs[0];
+            const mergedConfig = mergeConfig(config, singlePageConfig);
+            Object.assign(config, mergedConfig);
+            log(`已应用单页面构建配置: ${buildSinglePage}`);
+            return;
+          } else {
+            throw new Error(`未找到页面: ${buildSinglePage}`);
+          }
+        }
+
+        // 策略构建模式：生成构建配置
         const forceBuildStrategy = process.env.VITE_MULTI_PAGE_STRATEGY;
         const buildConfigs = generateBuildConfig({
           entry: resolvedOptions.entry || 'src/pages/**/*.{ts,js}',

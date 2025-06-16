@@ -203,15 +203,60 @@ Control how build outputs are organized using the `merge` option:
 ```typescript
 export default defineConfig({
   // ... other configurations
-  merge: 'all' | 'strategy' | 'page',
+  merge: 'all' | 'page',
 });
 ```
 
-- **`all`** (default): All HTML files in root directory, assets merged into `/dist/assets/`
-- **`strategy`**: Group by strategy, e.g., `/dist/mobile/page1.html`, `/dist/desktop/page1.html`
-- **`page`**: Group by page, e.g., `/dist/homePage/index.html`, `/dist/aboutPage/index.html`
+#### Available Modes
 
-> **Note**: When using `strategy` or `page` mode, static assets from the `public/` directory are automatically copied to each subdirectory to ensure correct asset paths.
+- **`all`** (default): All HTML files in root directory, assets merged into `/dist/assets/`
+
+  ```
+  dist/
+  ├── home.html
+  ├── about.html
+  ├── mobile.html
+  └── assets/
+      ├── home-xxx.js
+      ├── about-xxx.js
+      └── shared-resource.svg
+  ```
+
+- **`page`**: Each page is independently packaged with its own complete set of resource copies
+  ```
+  dist/
+  ├── home/
+  │   ├── index.html
+  │   ├── assets/
+  │   │   ├── home-xxx.js
+  │   │   └── button-loading.svg
+  │   └── images/
+  ├── about/
+  │   ├── index.html
+  │   ├── assets/
+  │   │   ├── about-xxx.js
+  │   │   └── button-loading.svg
+  │   └── images/
+  └── mobile/
+      ├── index.html
+      ├── assets/
+      │   ├── mobile-xxx.js
+      │   └── button-loading.svg
+      └── images/
+  ```
+
+#### Advantages of Page Mode
+
+- ✅ **Fully Independent**: Each page directory contains all required resources, can be deployed independently
+- ✅ **Avoid Conflicts**: Completely resolves shared resource attribution issues
+- ✅ **Clean Naming**: Resource files use clean file names without page prefixes
+- ✅ **Deployment Friendly**: Supports CDN distribution, micro-frontend architectures
+
+> **Note**:
+>
+> - Page mode creates resource copies for each page, which may increase overall build output size
+> - Suitable for scenarios requiring independent deployment or strict resource isolation
+> - Static assets from the `public/` directory are automatically copied to each page directory
 
 ### Page Strategy Assignment
 
@@ -258,9 +303,64 @@ npm run dev
 npm run dev -- --strategy mobile
 ```
 
+## Usage Examples
+
+### Page Mode for Independent Deployment
+
+Configure Page mode where each page gets complete independent resources:
+
+```typescript
+// multipage.config.ts
+export default defineConfig({
+  entry: 'src/pages/**/*.{ts,js}',
+  template: 'index.html',
+  merge: 'page', // Enable Page mode
+  strategies: {
+    default: {
+      build: {
+        sourcemap: false,
+        minify: 'esbuild',
+      },
+    },
+    mobile: {
+      build: {
+        target: ['es2015'],
+        minify: 'terser',
+      },
+    },
+  },
+  pageConfigs: context => {
+    if (context.relativePath.includes('/mobile/')) {
+      return { strategy: 'mobile' };
+    }
+    return { strategy: 'default' };
+  },
+});
+```
+
+Build result: Each page has independent resource files, avoiding shared resource missing issues.
+
+### Shared Resource Handling
+
+In Page mode, shared resources (such as icons, style files) are copied to each page directory:
+
+```typescript
+// src/pages/about/main.ts
+import buttonIcon from '../button-loading.svg'; // Shared resource
+
+// src/pages/mobile/main.ts
+import buttonIcon from '../button-loading.svg'; // Same shared resource
+```
+
+After building, both pages will have their own resource copies:
+
+- `dist/about/assets/button-loading-xxx.svg`
+- `dist/mobile/assets/button-loading-xxx.svg`
+
 ## Environment Variables
 
 - `VITE_BUILD_STRATEGY`: Specify a single strategy build
+- `VITE_MULTI_PAGE_BUILD_SINGLE_PAGE`: Specify single page build (used internally by Page mode)
 - `IS_MOBILE`: Mobile identifier (configured in define)
 - `API_BASE`: API base address (configured in define)
 
@@ -286,15 +386,16 @@ export default config;
 
 ### Configuration Options
 
-| Option        | Type                       | Default Value              | Description               |
-| ------------- | -------------------------- | -------------------------- | ------------------------- |
-| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | Page entry matching rules |
-| `template`    | `string`                   | `'index.html'`             | HTML Template File        |
-| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | 模板占位符                |
-| `exclude`     | `string[]`                 | `[]`                       | 排除的文件模式            |
-| `debug`       | `boolean`                  | `false`                    | 启用调试日志              |
-| `strategies`  | `Record<string, Strategy>` | `{}`                       | 构建策略配置              |
-| `pageConfigs` | `Function \| Object`       | `{}`                       | 页面配置                  |
+| Option        | Type                       | Default Value              | Description                  |
+| ------------- | -------------------------- | -------------------------- | ---------------------------- |
+| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | Page entry matching rules    |
+| `template`    | `string`                   | `'index.html'`             | HTML Template File           |
+| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | Template placeholder         |
+| `exclude`     | `string[]`                 | `[]`                       | Excluded file patterns       |
+| `debug`       | `boolean`                  | `false`                    | Enable debug logging         |
+| `merge`       | `'all' \| 'page'`          | `'all'`                    | Build output merge strategy  |
+| `strategies`  | `Record<string, Strategy>` | `{}`                       | Build strategy configuration |
+| `pageConfigs` | `Function \| Object`       | `{}`                       | Page configuration           |
 
 ### Utility Functions
 
