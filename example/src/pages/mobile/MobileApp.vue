@@ -3,6 +3,7 @@
     <header class="mobile-header">
       <h1>📱 Vue 移动端应用</h1>
       <p>Vue3 + PostCSS rem 适配演示</p>
+      <img :src="icon" alt="icon" />
     </header>
 
     <main class="mobile-main">
@@ -143,6 +144,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { version } from 'vue';
 import styles from '../test-styles.module.css';
+import icon from './button-loading.svg';
 
 // 响应式数据
 const count = ref(0);

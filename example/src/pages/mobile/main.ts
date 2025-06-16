@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import App from './MobileApp.vue';
 import './styles.css'; // 测试postcss-pxtorem
+import '../ttt.css';
 
 createApp(App).mount('#app');
 console.log('这是移动版应用');

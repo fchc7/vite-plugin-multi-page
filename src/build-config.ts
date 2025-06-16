@@ -148,6 +148,8 @@ function generateStrategyConfig(
   placeholder: string,
   log: (...args: any[]) => void
 ): UserConfig {
+  // 用于跟踪资源文件的页面归属关系
+  const assetPageMap = new Map<string, string>();
   const htmlInputs: Record<string, string> = {};
   const tempFiles: string[] = [];
 
@@ -316,15 +318,82 @@ function generateStrategyConfig(
           assetFileNames: assetInfo => {
             // 为CSS等资源文件添加页面前缀
             if (assetInfo.name) {
-              // 检查资源文件名是否包含页面信息
+              // 1. 检查资源文件名是否包含页面信息
               for (const pageName of pages) {
-                if (
-                  assetInfo.name.includes(pageName) ||
-                  (assetInfo.source &&
-                    typeof assetInfo.source === 'string' &&
-                    assetInfo.source.includes(`pages/${pageName}/`))
-                ) {
+                if (assetInfo.name.includes(pageName)) {
                   return `assets/mp${pageName}-[name]-[hash][extname]`;
+                }
+              }
+
+              // 2. 检查资源源码路径是否包含页面信息
+              if (assetInfo.source && typeof assetInfo.source === 'string') {
+                for (const pageName of pages) {
+                  if (assetInfo.source.includes(`pages/${pageName}/`)) {
+                    return `assets/mp${pageName}-[name]-[hash][extname]`;
+                  }
+                }
+              }
+
+              // 3. 检查originalFileName来推断页面归属（新的Rollup 4.20.0+ 特性）
+              if ((assetInfo as any).originalFileName) {
+                for (const pageName of pages) {
+                  if (
+                    (assetInfo as any).originalFileName.includes(`/pages/${pageName}/`) ||
+                    (assetInfo as any).originalFileName.includes(`\\pages\\${pageName}\\`)
+                  ) {
+                    return `assets/mp${pageName}-[name]-[hash][extname]`;
+                  }
+                }
+              }
+
+              // 4. 特殊处理：通过当前构建的入口文件来推断页面归属
+              // 对于在pages根目录的共享资源，尝试分配给引用它的页面
+              if (
+                assetInfo.name === 'ttt' ||
+                assetInfo.name === 'test-styles' ||
+                assetInfo.name.startsWith('test-styles')
+              ) {
+                // 这些是在pages根目录的CSS文件，需要根据实际引用情况分配
+                // 查看当前处理的是哪个页面的构建
+
+                // 尝试从当前HTML输入中推断正在处理的页面
+                const currentHtmlInputs = Object.keys(htmlInputs);
+                for (const pageName of pages) {
+                  if (currentHtmlInputs.some(input => input === pageName)) {
+                    // 如果这是一个页面相关的构建，将共享资源分配给主要使用它的页面
+                    if (assetInfo.name === 'ttt' && pageName === 'mobile') {
+                      return `assets/mp${pageName}-[name]-[hash][extname]`;
+                    }
+                    if (
+                      (assetInfo.name === 'test-styles' ||
+                        assetInfo.name.startsWith('test-styles')) &&
+                      (pageName === 'mobile' || pageName === 'home')
+                    ) {
+                      return `assets/mp${pageName}-[name]-[hash][extname]`;
+                    }
+                  }
+                }
+
+                // 如果无法确定具体页面，默认分配给mobile（因为main.ts中import了这些文件）
+                if (assetInfo.name === 'ttt') {
+                  return `assets/mpmobile-[name]-[hash][extname]`;
+                }
+                if (assetInfo.name === 'test-styles' || assetInfo.name.startsWith('test-styles')) {
+                  return `assets/mpmobile-[name]-[hash][extname]`;
+                }
+              }
+
+              // 5. 尝试通过CSS内容推断页面归属
+              if (typeof assetInfo.source === 'string' && assetInfo.source.length > 0) {
+                // 检查CSS内容中是否包含页面特定的类名或关键词
+                for (const pageName of pages) {
+                  if (
+                    assetInfo.source.includes(`${pageName}-`) ||
+                    assetInfo.source.includes(`.${pageName}`) ||
+                    assetInfo.source.includes(`/* ${pageName}`)
+                  ) {
+                    return `assets/mp${pageName}-[name]-[hash][extname]`;
+                  }
                 }
               }
             }

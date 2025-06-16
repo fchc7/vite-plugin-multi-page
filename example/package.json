@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:mobile": "vite -- --strategy=mobile",
     "dev:about": "vite -- --strategy=about",
-    "build": "vite-mp",
+    "build": "node ../dist/cli.js --debug",
     "build:mobile": "vite-mp --strategy mobile",
     "build:about": "vite-mp --strategy about",
     "build:multi": "vite-mp --strategy mobile,about",
