@@ -89,8 +89,9 @@ async function loadViteConfig(): Promise<Options> {
       command: 'build',
       isCLI: true,
     });
-  } else {
-    console.log('ℹ️  未找到配置文件，使用默认配置');
+    if (!userConfig) {
+      console.log('❌ 配置文件加载失败');
+    }
   }
 
   // 合并用户配置和默认配置
@@ -199,7 +200,8 @@ function buildStrategy(
 function buildSinglePage(
   pageName: string,
   viteBuildArgs: string[],
-  debug: boolean
+  debug: boolean,
+  pageStrategy: string
 ): Promise<PageBuildResult> {
   return new Promise(resolve => {
     const log = debug ? console.log.bind(console, `[${pageName}]`) : () => {};
@@ -209,11 +211,12 @@ function buildSinglePage(
     // 每个页面使用独立的临时输出目录
     const tempOutputDir = path.resolve(process.cwd(), `dist-temp-${pageName}`);
 
-    // 设置环境变量来指定构建页面和输出目录
+    // 设置环境变量 - 统一使用 VITE_MULTI_PAGE_STRATEGY
     const env = {
       ...process.env,
       VITE_MULTI_PAGE_BUILD_SINGLE_PAGE: pageName,
       VITE_MULTI_PAGE_TEMP_OUTPUT_DIR: tempOutputDir,
+      VITE_MULTI_PAGE_STRATEGY: pageStrategy,
     };
 
     // 构建命令，添加 --outDir 参数
@@ -297,9 +300,6 @@ async function mergePageResults(
 ): Promise<void> {
   const log = debug ? console.log.bind(console, '[merge]') : () => {};
 
-  log('开始合并页面构建结果...');
-  log('page模式：每个页面独立存放在自己的目录中');
-
   const distDir = path.resolve(process.cwd(), 'dist');
 
   // 创建临时目录用于重组（在当前目录而不是在dist目录下）
@@ -320,8 +320,6 @@ async function mergePageResults(
       continue;
     }
 
-    log(`处理页面: ${result.pageName}`);
-
     // 创建页面临时目录
     const tempPageDir = path.resolve(tempMergeDir, result.pageName);
     fs.mkdirSync(tempPageDir, { recursive: true });
@@ -337,12 +335,10 @@ async function mergePageResults(
           // HTML文件重命名为index.html
           const finalTargetPath = path.resolve(tempPageDir, 'index.html');
           fs.copyFileSync(sourcePath, finalTargetPath);
-          log(`复制HTML: ${entry.name} -> ${result.pageName}/index.html`);
         } else {
           // 其他文件直接复制
           const targetPath = path.resolve(tempPageDir, entry.name);
           fs.copyFileSync(sourcePath, targetPath);
-          log(`复制文件: ${entry.name} -> ${result.pageName}/${entry.name}`);
         }
       } else if (entry.isDirectory()) {
         // 目录递归复制，但不包含以页面名命名的子目录
@@ -358,12 +354,10 @@ async function mergePageResults(
               fs.cpSync(subSourcePath, subTargetPath, { recursive: true });
             }
           }
-          log(`复制目录内容: ${entry.name}/* -> ${result.pageName}/`);
         } else {
           // 普通目录递归复制
           const targetPath = path.resolve(tempPageDir, entry.name);
           fs.cpSync(sourcePath, targetPath, { recursive: true });
-          log(`复制目录: ${entry.name} -> ${result.pageName}/${entry.name}`);
         }
       }
     }
@@ -385,31 +379,23 @@ async function mergePageResults(
   // 将临时目录重命名为最终目录
   try {
     fs.renameSync(tempMergeDir, distDir);
-    log(`成功重命名临时目录到最终目录: ${tempMergeDir} -> ${distDir}`);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log(`重命名失败，尝试复制方式: ${errorMessage}`);
     // 如果重命名失败，使用复制方式
     fs.cpSync(tempMergeDir, distDir, { recursive: true });
     fs.rmSync(tempMergeDir, { recursive: true, force: true });
-    log(`使用复制方式成功创建最终目录: ${distDir}`);
   }
 
   // 清理备份目录
   if (fs.existsSync(distBackup)) {
     fs.rmSync(distBackup, { recursive: true, force: true });
-    log(`清理备份目录: ${distBackup}`);
   }
 
   // 清理各页面的临时构建目录
   for (const result of results) {
     if (result.outputDir && fs.existsSync(result.outputDir)) {
       fs.rmSync(result.outputDir, { recursive: true, force: true });
-      log(`清理临时目录: ${result.outputDir}`);
     }
   }
-
-  log('✅ 页面构建结果合并完成');
 }
 
 /**
@@ -552,11 +538,7 @@ async function mergeResultsWithReorganization(
 /**
  * 清理临时HTML文件
  */
-async function cleanupTempFiles(debug: boolean): Promise<void> {
-  const log = debug ? console.log.bind(console, '[cleanup]') : () => {};
-
-  log('清理临时HTML文件...');
-
+async function cleanupTempFiles(_debug: boolean): Promise<void> {
   // 使用glob查找新命名规则的临时HTML文件
   const tempHtmlFiles = glob.sync('.temp.mp.*.html', { cwd: process.cwd() });
 
@@ -564,16 +546,9 @@ async function cleanupTempFiles(debug: boolean): Promise<void> {
     const tempPath = path.resolve(process.cwd(), tempFile);
     try {
       fs.unlinkSync(tempPath);
-      log(`删除临时文件: ${tempFile}`);
     } catch (error) {
-      log(`删除临时文件失败: ${tempFile}`, error);
+      // 静默处理删除失败
     }
-  }
-
-  if (tempHtmlFiles.length === 0) {
-    log('没有找到临时文件');
-  } else {
-    log(`✅ 清理了 ${tempHtmlFiles.length} 个临时文件`);
   }
 }
 
@@ -661,9 +636,6 @@ async function main(): Promise<void> {
     const options = await loadViteConfig();
     const mergeMode = options.merge || 'all';
 
-    log(`加载的配置:`, options);
-    log(`mergeMode: ${mergeMode}`);
-
     // 2. 清理输出目录
     log('🧹 清理输出目录...');
     const { cleanViteOutputDirectory } = await import('./build-config');
@@ -711,9 +683,28 @@ async function buildPagesMode(
 
   log(`发现页面: ${pages.map(p => p.name).join(', ')}`);
 
-  // 2. 并行构建所有页面
+  // 2. 获取每个页面的策略信息
+  const { getPageConfig } = await import('./page-config');
+  const pageStrategies = new Map<string, string>();
+
+  for (const page of pages) {
+    const pageContext = {
+      pageName: page.name,
+      filePath: page.file,
+      relativePath: path.relative(process.cwd(), page.file),
+    };
+
+    const pageConfig = getPageConfig(options.pageConfigs, pageContext, () => {});
+    const strategy = pageConfig?.strategy || 'default';
+    pageStrategies.set(page.name, strategy);
+  }
+
+  // 3. 并行构建所有页面
   log('🔨 开始并行构建页面...');
-  const buildPromises = pages.map(page => buildSinglePage(page.name, viteBuildArgs, debug));
+  const buildPromises = pages.map(page => {
+    const strategy = pageStrategies.get(page.name) || 'default';
+    return buildSinglePage(page.name, viteBuildArgs, debug, strategy);
+  });
   const results = await Promise.all(buildPromises);
 
   // 3. 检查构建结果
@@ -737,7 +728,6 @@ async function buildPagesMode(
   }
 
   // 4. 合并页面构建结果
-  log('📦 合并页面构建结果...');
   await mergePageResults(results, options, debug);
 
   // 5. 清理临时文件

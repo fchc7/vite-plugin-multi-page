@@ -1,0 +1,38 @@
+const config = context => {
+  const { mode, command, isCLI } = context;
+  const isProduction = mode === 'production';
+
+  return {
+    entry: 'src/pages/**/*.{ts,js}',
+    template: 'index.html',
+    placeholder: '{{ENTRY_FILE}}',
+    exclude: ['src/shared/**/*.ts'],
+    debug: !isProduction || isCLI,
+    merge: 'page',
+    strategies: {
+      default: {
+        define: { IS_DEFAULT: true },
+        build: { sourcemap: !isProduction },
+      },
+      mobile: {
+        define: { IS_MOBILE: true },
+        build: { target: ['es2015'] },
+      },
+      tablet: {
+        define: { IS_TABLET: true },
+        build: { target: ['es2018'] },
+      },
+    },
+    pageConfigs: context => {
+      if (context.relativePath.includes('/mobile/')) {
+        return { strategy: 'mobile', define: { PAGE_NAME: context.pageName } };
+      }
+      if (context.relativePath.includes('/tablet/')) {
+        return { strategy: 'tablet', define: { PAGE_NAME: context.pageName } };
+      }
+      return { strategy: 'default', define: { PAGE_NAME: context.pageName } };
+    },
+  };
+};
+
+export default config;

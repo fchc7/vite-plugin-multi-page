@@ -13,9 +13,6 @@ export function getPageConfig(
   // 如果是函数，直接调用
   if (typeof pageConfigs === 'function') {
     const result = pageConfigs(context);
-    if (result) {
-      // log(`函数配置匹配页面 ${context.pageName}:`, result);
-    }
     return result;
   }
 

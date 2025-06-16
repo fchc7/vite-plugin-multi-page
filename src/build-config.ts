@@ -70,8 +70,6 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
         return {};
       }
 
-      log(`强制构建页面: ${forceBuildPage}`);
-
       // 获取该页面的策略
       const pageStrategy = pageStrategies.get(forceBuildPage) || 'default';
       const strategyConfig = strategies[pageStrategy] || {};
