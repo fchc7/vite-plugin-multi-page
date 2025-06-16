@@ -148,8 +148,6 @@ function generateStrategyConfig(
   placeholder: string,
   log: (...args: any[]) => void
 ): UserConfig {
-  // 用于跟踪资源文件的页面归属关系
-  const assetPageMap = new Map<string, string>();
   const htmlInputs: Record<string, string> = {};
   const tempFiles: string[] = [];
 
