@@ -113,7 +113,7 @@ const config = context => {
         return {
           strategy: 'mobile',
           define: {
-            PAGE_NAME: context.pageName,
+            PAGE_NAME: `"${context.pageName}"`,
             MOBILE_PAGE: true,
           },
           template: context.pageName === 'mobile' ? 'mobile.html' : undefined,
@@ -124,7 +124,7 @@ const config = context => {
         return {
           strategy: 'tablet',
           define: {
-            PAGE_NAME: context.pageName,
+            PAGE_NAME: `"${context.pageName}"`,
             TABLET_PAGE: true,
           },
         };
@@ -134,10 +134,42 @@ const config = context => {
       return {
         strategy: 'default',
         define: {
-          PAGE_NAME: context.pageName,
+          PAGE_NAME: `"${context.pageName}"`,
           DEFAULT_PAGE: true,
         },
       };
+    },
+
+    // 页面环境变量注入函数 (仅在 page 模式下生效)
+    pageEnvs: context => {
+      const { pageName, strategy } = context;
+
+      // 为每个页面注入特定的环境变量
+      const envs: Record<string, string> = {
+        VITE_CURRENT_PAGE_NAME: pageName,
+        VITE_CURRENT_STRATEGY: strategy || 'default',
+        VITE_BUILD_TIMESTAMP: new Date().toISOString(),
+      };
+
+      // 根据页面类型添加特定环境变量
+      if (context.relativePath.includes('/mobile/')) {
+        envs.VITE_IS_MOBILE_BUILD = 'true';
+        envs.VITE_MOBILE_API_URL = isProduction
+          ? 'https://mobile-api.example.com'
+          : 'http://localhost:3001/mobile-api';
+      } else if (context.relativePath.includes('/tablet/')) {
+        envs.VITE_IS_TABLET_BUILD = 'true';
+        envs.VITE_TABLET_API_URL = isProduction
+          ? 'https://tablet-api.example.com'
+          : 'http://localhost:3001/tablet-api';
+      } else {
+        envs.VITE_IS_DESKTOP_BUILD = 'true';
+        envs.VITE_DESKTOP_API_URL = isProduction
+          ? 'https://api.example.com'
+          : 'http://localhost:3001/api';
+      }
+
+      return envs;
     },
   };
 };

@@ -361,8 +361,75 @@ After building, both pages will have their own resource copies:
 
 - `VITE_BUILD_STRATEGY`: Specify a single strategy build
 - `VITE_MULTI_PAGE_BUILD_SINGLE_PAGE`: Specify single page build (used internally by Page mode)
+- `VITE_MULTI_PAGE_STRATEGY`: Current build strategy (automatically set)
+- `VITE_MULTI_PAGE_CURRENT_PAGE`: Current page name (automatically set in Page mode)
+- `VITE_MULTI_PAGE_MERGE_MODE`: Current merge mode (automatically set in Page mode)
 - `IS_MOBILE`: Mobile identifier (configured in define)
 - `API_BASE`: API base address (configured in define)
+
+### Page Mode Environment Variable Injection
+
+In Page mode (`merge: 'page'`), you can inject specific environment variables for each page through the `pageEnvs` function:
+
+```typescript
+// multipage.config.ts
+export default defineConfig({
+  merge: 'page', // Enable Page mode
+
+  // Page environment variable injection function
+  pageEnvs: context => {
+    const { pageName, strategy, relativePath } = context;
+
+    // Return page-specific environment variables
+    const envs: Record<string, string> = {
+      VITE_CURRENT_PAGE_NAME: pageName,
+      VITE_CURRENT_STRATEGY: strategy || 'default',
+      VITE_BUILD_TIMESTAMP: new Date().toISOString(),
+    };
+
+    // Add specific variables based on page path
+    if (relativePath.includes('/mobile/')) {
+      envs.VITE_IS_MOBILE = 'true';
+      envs.VITE_API_URL = 'https://mobile-api.example.com';
+    }
+
+    return envs;
+  },
+});
+```
+
+#### Page Context
+
+The `pageEnvs` function receives a page context object containing the following information:
+
+- `pageName`: Page name (e.g., 'home', 'mobile')
+- `strategy`: Strategy name assigned to this page
+- `filePath`: Absolute path of the page entry file
+- `relativePath`: Relative path of the page entry file
+
+#### Use Cases
+
+1. **Page-specific API configuration**: Set different API endpoints for different pages
+2. **Page identification**: Identify the current page type at runtime
+3. **Build information**: Inject build timestamps, version numbers, etc.
+4. **Feature flags**: Enable or disable features for specific pages
+
+#### Usage in Code
+
+Injected environment variables can be accessed in code via `import.meta.env`:
+
+```typescript
+// src/pages/mobile/main.ts
+console.log('Current page:', import.meta.env.VITE_CURRENT_PAGE_NAME);
+console.log('Current strategy:', import.meta.env.VITE_CURRENT_STRATEGY);
+console.log('Build time:', import.meta.env.VITE_BUILD_TIMESTAMP);
+
+if (import.meta.env.VITE_IS_MOBILE === 'true') {
+  // Mobile-specific logic
+}
+```
+
+**Note**: The `pageEnvs` feature only works in Page mode (`merge: 'page'`) because only in this mode each page is built independently.
 
 ## TypeScript Support
 
@@ -386,16 +453,17 @@ export default config;
 
 ### Configuration Options
 
-| Option        | Type                       | Default Value              | Description                  |
-| ------------- | -------------------------- | -------------------------- | ---------------------------- |
-| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | Page entry matching rules    |
-| `template`    | `string`                   | `'index.html'`             | HTML Template File           |
-| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | Template placeholder         |
-| `exclude`     | `string[]`                 | `[]`                       | Excluded file patterns       |
-| `debug`       | `boolean`                  | `false`                    | Enable debug logging         |
-| `merge`       | `'all' \| 'page'`          | `'all'`                    | Build output merge strategy  |
-| `strategies`  | `Record<string, Strategy>` | `{}`                       | Build strategy configuration |
-| `pageConfigs` | `Function \| Object`       | `{}`                       | Page configuration           |
+| Option        | Type                       | Default Value              | Description                                                   |
+| ------------- | -------------------------- | -------------------------- | ------------------------------------------------------------- |
+| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | Page entry matching rules                                     |
+| `template`    | `string`                   | `'index.html'`             | HTML Template File                                            |
+| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | Template placeholder                                          |
+| `exclude`     | `string[]`                 | `[]`                       | Excluded file patterns                                        |
+| `debug`       | `boolean`                  | `false`                    | Enable debug logging                                          |
+| `merge`       | `'all' \| 'page'`          | `'all'`                    | Build output merge strategy                                   |
+| `strategies`  | `Record<string, Strategy>` | `{}`                       | Build strategy configuration                                  |
+| `pageConfigs` | `Function \| Object`       | `{}`                       | Page configuration                                            |
+| `pageEnvs`    | `Function`                 | `() => null`               | Page environment variable injection function (Page mode only) |
 
 ### Utility Functions
 

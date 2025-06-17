@@ -14,6 +14,7 @@ export const DEFAULT_CONFIG: Required<Omit<MultiPageOptions, '__forceBuildStrate
     default: {},
   },
   pageConfigs: {},
+  pageEnvs: () => null,
 };
 
 /**
@@ -35,6 +36,7 @@ export function mergeWithDefaults(
     merge: userConfig.merge ?? DEFAULT_CONFIG.merge,
     strategies: userConfig.strategies ?? DEFAULT_CONFIG.strategies,
     pageConfigs: userConfig.pageConfigs ?? DEFAULT_CONFIG.pageConfigs,
+    pageEnvs: userConfig.pageEnvs ?? DEFAULT_CONFIG.pageEnvs,
     __forceBuildStrategy: userConfig.__forceBuildStrategy,
   };
 }

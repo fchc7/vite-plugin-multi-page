@@ -201,7 +201,9 @@ function buildSinglePage(
   pageName: string,
   viteBuildArgs: string[],
   debug: boolean,
-  pageStrategy: string
+  pageStrategy: string,
+  options: any,
+  page: any
 ): Promise<PageBuildResult> {
   return new Promise(resolve => {
     const log = debug ? console.log.bind(console, `[${pageName}]`) : () => {};
@@ -211,13 +213,39 @@ function buildSinglePage(
     // 每个页面使用独立的临时输出目录
     const tempOutputDir = path.resolve(process.cwd(), `dist-temp-${pageName}`);
 
-    // 设置环境变量 - 统一使用 VITE_MULTI_PAGE_STRATEGY
-    const env = {
+    // 准备基础环境变量
+    const baseEnv = {
       ...process.env,
       VITE_MULTI_PAGE_BUILD_SINGLE_PAGE: pageName,
       VITE_MULTI_PAGE_TEMP_OUTPUT_DIR: tempOutputDir,
       VITE_MULTI_PAGE_STRATEGY: pageStrategy,
+      VITE_MULTI_PAGE_CURRENT_PAGE: pageName, // 添加当前页面名称
+      VITE_MULTI_PAGE_MERGE_MODE: options.merge || 'all', // 添加合并模式
     };
+
+    // 如果配置了pageEnvs函数，获取页面特定的环境变量
+    if (options.pageEnvs && typeof options.pageEnvs === 'function') {
+      try {
+        // 构建页面上下文
+        const pageContext = {
+          pageName,
+          filePath: page.file,
+          relativePath: path.relative(process.cwd(), page.file),
+          strategy: pageStrategy,
+        };
+
+        const customEnvs = options.pageEnvs(pageContext);
+        if (customEnvs && typeof customEnvs === 'object') {
+          // 合并自定义环境变量，确保值是有效的字符串
+          for (const [key, value] of Object.entries(customEnvs)) {
+            baseEnv[key] = String(value);
+          }
+          log(`注入自定义环境变量:`, Object.keys(customEnvs));
+        }
+      } catch (error) {
+        log(`警告: 获取页面环境变量失败:`, error);
+      }
+    }
 
     // 构建命令，添加 --outDir 参数
     const args = ['build', '--outDir', tempOutputDir, ...viteBuildArgs];
@@ -226,7 +254,7 @@ function buildSinglePage(
 
     const child = spawn('npx', ['vite', ...args], {
       stdio: debug ? 'inherit' : 'pipe',
-      env,
+      env: baseEnv,
       cwd: process.cwd(),
     });
 
@@ -703,7 +731,7 @@ async function buildPagesMode(
   log('🔨 开始并行构建页面...');
   const buildPromises = pages.map(page => {
     const strategy = pageStrategies.get(page.name) || 'default';
-    return buildSinglePage(page.name, viteBuildArgs, debug, strategy);
+    return buildSinglePage(page.name, viteBuildArgs, debug, strategy, options, page);
   });
   const results = await Promise.all(buildPromises);
 

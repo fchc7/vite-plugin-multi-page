@@ -361,8 +361,75 @@ import buttonIcon from '../button-loading.svg'; // 相同的共享资源
 
 - `VITE_BUILD_STRATEGY`: 指定单个策略构建
 - `VITE_MULTI_PAGE_BUILD_SINGLE_PAGE`: 指定单个页面构建（Page模式内部使用）
+- `VITE_MULTI_PAGE_STRATEGY`: 当前构建策略（自动设置）
+- `VITE_MULTI_PAGE_CURRENT_PAGE`: 当前页面名称（Page模式下自动设置）
+- `VITE_MULTI_PAGE_MERGE_MODE`: 当前合并模式（Page模式下自动设置）
 - `IS_MOBILE`: 移动端标识 (在 define 中配置)
 - `API_BASE`: API 基础地址 (在 define 中配置)
+
+### Page模式环境变量注入
+
+在Page模式（`merge: 'page'`）下，您可以通过 `pageEnvs` 函数为每个页面注入特定的环境变量：
+
+```typescript
+// multipage.config.ts
+export default defineConfig({
+  merge: 'page', // 启用Page模式
+
+  // 页面环境变量注入函数
+  pageEnvs: context => {
+    const { pageName, strategy, relativePath } = context;
+
+    // 返回该页面特定的环境变量
+    const envs: Record<string, string> = {
+      VITE_CURRENT_PAGE_NAME: pageName,
+      VITE_CURRENT_STRATEGY: strategy || 'default',
+      VITE_BUILD_TIMESTAMP: new Date().toISOString(),
+    };
+
+    // 根据页面路径添加特定变量
+    if (relativePath.includes('/mobile/')) {
+      envs.VITE_IS_MOBILE = 'true';
+      envs.VITE_API_URL = 'https://mobile-api.example.com';
+    }
+
+    return envs;
+  },
+});
+```
+
+#### 页面上下文 (PageContext)
+
+`pageEnvs` 函数接收一个页面上下文对象，包含以下信息：
+
+- `pageName`: 页面名称 (如 'home', 'mobile')
+- `strategy`: 分配给该页面的策略名称
+- `filePath`: 页面入口文件的绝对路径
+- `relativePath`: 页面入口文件的相对路径
+
+#### 使用场景
+
+1. **页面特定的API配置**: 为不同页面设置不同的API端点
+2. **页面标识**: 在运行时识别当前页面类型
+3. **构建信息**: 注入构建时间戳、版本号等信息
+4. **功能开关**: 为特定页面启用或禁用功能
+
+#### 在代码中使用
+
+注入的环境变量可以在代码中通过 `import.meta.env` 访问：
+
+```typescript
+// src/pages/mobile/main.ts
+console.log('当前页面:', import.meta.env.VITE_CURRENT_PAGE_NAME);
+console.log('当前策略:', import.meta.env.VITE_CURRENT_STRATEGY);
+console.log('构建时间:', import.meta.env.VITE_BUILD_TIMESTAMP);
+
+if (import.meta.env.VITE_IS_MOBILE === 'true') {
+  // 移动端特定逻辑
+}
+```
+
+**注意**: `pageEnvs` 功能仅在Page模式（`merge: 'page'`）下生效，因为only这种模式下每个页面是独立构建的。
 
 ## TypeScript 支持
 
@@ -386,16 +453,17 @@ export default config;
 
 ### 配置选项
 
-| 选项          | 类型                       | 默认值                     | 描述             |
-| ------------- | -------------------------- | -------------------------- | ---------------- |
-| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | 页面入口匹配规则 |
-| `template`    | `string`                   | `'index.html'`             | HTML 模板文件    |
-| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | 模板占位符       |
-| `exclude`     | `string[]`                 | `[]`                       | 排除的文件模式   |
-| `debug`       | `boolean`                  | `false`                    | 启用调试日志     |
-| `merge`       | `'all' \| 'page'`          | `'all'`                    | 构建产物合并策略 |
-| `strategies`  | `Record<string, Strategy>` | `{}`                       | 构建策略配置     |
-| `pageConfigs` | `Function \| Object`       | `{}`                       | 页面配置         |
+| 选项          | 类型                       | 默认值                     | 描述                               |
+| ------------- | -------------------------- | -------------------------- | ---------------------------------- |
+| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | 页面入口匹配规则                   |
+| `template`    | `string`                   | `'index.html'`             | HTML 模板文件                      |
+| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | 模板占位符                         |
+| `exclude`     | `string[]`                 | `[]`                       | 排除的文件模式                     |
+| `debug`       | `boolean`                  | `false`                    | 启用调试日志                       |
+| `merge`       | `'all' \| 'page'`          | `'all'`                    | 构建产物合并策略                   |
+| `strategies`  | `Record<string, Strategy>` | `{}`                       | 构建策略配置                       |
+| `pageConfigs` | `Function \| Object`       | `{}`                       | 页面配置                           |
+| `pageEnvs`    | `Function`                 | `() => null`               | 页面环境变量注入函数（仅Page模式） |
 
 ### 工具函数
 
