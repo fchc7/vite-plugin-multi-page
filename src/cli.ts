@@ -124,10 +124,12 @@ function buildStrategy(
 
     log(`执行命令: npx vite ${args.join(' ')}`);
 
+    // 在Windows环境下，使用shell选项来确保npx命令能够正确执行
     const child = spawn('npx', ['vite', ...args], {
       stdio: debug ? 'inherit' : 'pipe',
       env,
       cwd: process.cwd(),
+      shell: process.platform === 'win32', // Windows下使用shell
     });
 
     let errorOutput = '';
@@ -252,10 +254,12 @@ function buildSinglePage(
 
     log(`执行命令: npx vite ${args.join(' ')}`);
 
+    // 在Windows环境下，使用shell选项来确保npx命令能够正确执行
     const child = spawn('npx', ['vite', ...args], {
       stdio: debug ? 'inherit' : 'pipe',
       env: baseEnv,
       cwd: process.cwd(),
+      shell: process.platform === 'win32', // Windows下使用shell
     });
 
     let errorOutput = '';
