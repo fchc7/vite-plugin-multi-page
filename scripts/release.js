@@ -220,7 +220,6 @@ function main() {
     log('🎉 本地发布流程完成！', colors.green);
     log(`📦 版本: v${newVersion}`, colors.yellow);
     log('🚀 推送tag后，GitHub Actions将自动发布到npm', colors.blue);
-    log('🌐 查看: https://www.npmjs.com/package/@fchc8/vite-plugin-multi-page', colors.blue);
   } catch (error) {
     log(`❌ 发布失败: ${error.message}`, colors.red);
     process.exit(1);
