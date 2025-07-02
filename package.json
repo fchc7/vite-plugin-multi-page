@@ -1,6 +1,6 @@
 {
   "name": "@fchc8/vite-plugin-multi-page",
-  "version": "1.11.1",
+  "version": "1.11.2",
   "description": "A powerful Vite plugin for building multi-page applications with smart file routing and multi-strategy builds",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
