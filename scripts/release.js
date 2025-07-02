@@ -166,20 +166,15 @@ function push() {
 }
 
 function publish(versionType, version) {
-  log('📦 发布到npm...', colors.yellow);
-
-  let publishCommand = 'npm publish';
-
-  // 对于预发布版本，添加对应的标签
-  if (versionType === 'beta') {
-    publishCommand += ' --tag beta';
-  } else if (versionType === 'alpha') {
-    publishCommand += ' --tag alpha';
-  }
-
-  exec(publishCommand);
-
-  log(`✅ 发布完成: v${version}`, colors.green);
+  log('📦 准备发布到npm...', colors.yellow);
+  log('💡 提示: npm发布将由GitHub Actions自动完成', colors.blue);
+  log(`📋 发布信息:`, colors.blue);
+  log(`  版本: v${version}`, colors.yellow);
+  log(`  类型: ${versionType}`, colors.yellow);
+  log(
+    `  标签: ${versionType === 'beta' ? 'beta' : versionType === 'alpha' ? 'alpha' : 'latest'}`,
+    colors.yellow
+  );
 }
 
 function main() {
@@ -222,8 +217,9 @@ function main() {
     // 7. 发布到npm
     publish(versionType, newVersion);
 
-    log('🎉 发布流程完成！', colors.green);
+    log('🎉 本地发布流程完成！', colors.green);
     log(`📦 版本: v${newVersion}`, colors.yellow);
+    log('🚀 推送tag后，GitHub Actions将自动发布到npm', colors.blue);
     log('🌐 查看: https://www.npmjs.com/package/@fchc8/vite-plugin-multi-page', colors.blue);
   } catch (error) {
     log(`❌ 发布失败: ${error.message}`, colors.red);
