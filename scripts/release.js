@@ -84,14 +84,6 @@ function checkGitStatus() {
 function runChecks() {
   log('🧪 运行代码检查...', colors.yellow);
 
-  // 安装依赖
-  log('📦 安装依赖...', colors.yellow);
-  if (fs.existsSync('pnpm-lock.yaml')) {
-    exec('pnpm install');
-  } else {
-    exec('npm ci');
-  }
-
   // 代码检查
   log('  - ESLint 检查...', colors.yellow);
   exec('npm run lint');
