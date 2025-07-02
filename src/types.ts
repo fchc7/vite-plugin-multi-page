@@ -9,6 +9,7 @@ export interface MultiPageOptions {
   debug?: boolean;
   merge?: 'all' | 'page'; // 构建产物合并模式
   strategies?: Record<string, ConfigStrategy>;
+  buildStrategies?: Record<string, ConfigStrategy>; // 别名，等同于 strategies
   pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
   pageEnvs?: PageEnvFunction; // 页面环境变量注入函数
   __forceBuildStrategy?: string;
