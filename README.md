@@ -11,7 +11,9 @@
 - 📝 **TypeScript 配置**: 支持 TypeScript 配置文件
 - 🚀 **CLI 工具**: 提供命令行批量构建工具
 - 🔄 **热重载**: 开发服务器支持页面热重载
-- 📦 **智能合并**: 自动合并多策略构建结果
+- 📦 **扁平化输出**: 支持扁平化构建结果，减少目录层级
+- ⚡ **并发构建**: 支持控制并发构建数量，提升构建效率
+- 🗂️ **资源去重**: 自动去重共享资源，减少构建产物大小
 
 ## 安装
 
@@ -60,20 +62,10 @@ export default defineConfig(() => ({}));
 创建 `multipage.config.ts` 或 `multipage.config.js`:
 
 ```typescript
-import { defineConfig } from 'vite-plugin-multi-page';
+import { defineConfig } from '@fchc8/vite-plugin-multi-page';
 
-// 方式1: 对象配置（推荐）
-export default defineConfig({
-  entry: 'src/pages/**/*.{ts,js}',
-  template: 'index.html',
-  strategies: {
-    // 策略配置...
-  },
-});
-
-// 方式2: 函数配置（动态配置）
 export default defineConfig(context => {
-  const { mode, command, isCLI } = context;
+  const { mode } = context;
   const isProduction = mode === 'production';
 
   return {
@@ -83,14 +75,8 @@ export default defineConfig(context => {
     // HTML 模板
     template: 'index.html',
 
-    // 模板占位符
-    placeholder: '{{ENTRY_FILE}}',
-
     // 排除的文件
     exclude: ['src/shared/**/*.ts'],
-
-    // 调试模式
-    debug: !isProduction || isCLI,
 
     // 构建策略
     strategies: {
@@ -121,25 +107,10 @@ export default defineConfig(context => {
 
     // 页面配置函数
     pageConfigs: context => {
-      // 根据文件路径判断应用的策略
       if (context.relativePath.includes('/mobile/')) {
-        return {
-          strategy: 'mobile',
-          define: {
-            PAGE_NAME: context.pageName,
-            MOBILE_PAGE: true,
-          },
-        };
+        return { strategy: 'mobile' };
       }
-
-      // 默认策略
-      return {
-        strategy: 'default',
-        define: {
-          PAGE_NAME: context.pageName,
-          DEFAULT_PAGE: true,
-        },
-      };
+      return { strategy: 'default' };
     },
   };
 });
@@ -148,8 +119,6 @@ export default defineConfig(context => {
 ### 3. 创建页面文件
 
 按照约定创建页面文件:
-
-**注意**：即使使用空配置 `defineConfig({})`，插件也会自动使用默认策略处理所有页面，确保最大兼容性。
 
 ```
 src/pages/
@@ -196,67 +165,95 @@ strategies: {
 }
 ```
 
-### 构建产物合并策略
+### 构建产物组织策略
 
-通过 `merge` 选项控制构建产物的组织方式：
+#### 策略分组模式（默认）
 
-```typescript
-export default defineConfig({
-  // ... 其他配置
-  merge: 'all' | 'page',
-});
+默认情况下，构建结果按策略分组：
+
+```
+dist/
+├── default/
+│   ├── home.html
+│   ├── about.html
+│   ├── assets/
+│   │   ├── home-xxx.js
+│   │   ├── about-xxx.js
+│   │   └── shared-resource.svg
+│   └── images/
+├── mobile/
+│   ├── mobile.html
+│   ├── assets/
+│   │   ├── mobile-xxx.js
+│   │   └── button-loading.svg
+│   └── images/
+└── tablet/
+    ├── tablet.html
+    ├── assets/
+    │   ├── tablet-xxx.js
+    │   └── button-loading.svg
+    └── images/
 ```
 
-#### 可用模式
+#### 扁平化模式（默认）
 
-- **`all`** (默认): 所有HTML文件放在根目录，资源合并到 `/dist/assets/`
+扁平化输出默认启用。使用 `--no-flatten` 参数禁用它：
 
-  ```
-  dist/
-  ├── home.html
-  ├── about.html
-  ├── mobile.html
-  └── assets/
-      ├── home-xxx.js
-      ├── about-xxx.js
-      └── shared-resource.svg
-  ```
+```bash
+# 默认行为（扁平化输出）
+npx vite-mp
 
-- **`page`**: 每个页面独立打包，各自拥有完整的资源副本
-  ```
-  dist/
-  ├── home/
-  │   ├── index.html
-  │   ├── assets/
-  │   │   ├── home-xxx.js
-  │   │   └── button-loading.svg
-  │   └── images/
-  ├── about/
-  │   ├── index.html
-  │   ├── assets/
-  │   │   ├── about-xxx.js
-  │   │   └── button-loading.svg
-  │   └── images/
-  └── mobile/
-      ├── index.html
-      ├── assets/
-      │   ├── mobile-xxx.js
-      │   └── button-loading.svg
-      └── images/
-  ```
+# 禁用扁平化输出
+npx vite-mp --no-flatten
+```
 
-#### Page模式的优势
+扁平化后的结构：
 
-- ✅ **完全独立**: 每个页面目录包含所有必需资源，可独立部署
-- ✅ **避免冲突**: 彻底解决了共享资源的归属问题
-- ✅ **简洁命名**: 资源文件使用干净的文件名，无页面前缀
-- ✅ **部署友好**: 支持CDN分发、微前端等架构模式
+```
+dist/
+├── home.html
+├── about.html
+├── mobile.html
+├── tablet.html
+├── assets/
+│   ├── home-xxx.js
+│   ├── about-xxx.js
+│   ├── mobile-xxx.js
+│   ├── tablet-xxx.js
+│   └── shared-resource.svg
+├── images/
+├── favicon.ico
+└── some.css
+```
 
-> **注意**:
->
-> - Page模式会为每个页面创建资源副本，可能增加总体构建产物大小
-> - 适合需要独立部署或有严格资源隔离需求的场景
-> - `public/` 目录中的静态资源会自动复制到每个页面目录中
+#### 扁平化模式的优势
+
+- ✅ **简化部署**: 所有文件在根目录，部署更简单
+- ✅ **资源去重**: 自动去重相同内容的资源文件
+- ✅ **减少层级**: 避免深层嵌套的目录结构
+- ✅ **统一管理**: 所有资源集中管理，便于CDN配置
+
+### 并发构建控制
+
+通过 `--concurrency` 参数控制并发构建数量：
+
+```bash
+# 默认并发数为3
+npx vite-mp
+
+# 设置并发数为1（串行构建）
+npx vite-mp --concurrency 1
+
+# 设置并发数为5（高并发）
+npx vite-mp --concurrency 5
+```
+
+#### 并发构建的优势
+
+- ⚡ **提升效率**: 多策略并行构建，减少总构建时间
+- 🔧 **资源控制**: 避免同时构建过多策略导致系统资源过载
+- 🎯 **灵活配置**: 根据机器性能调整并发数量
+- 📊 **进度可见**: 调试模式下显示批次构建进度
 
 ### 页面策略分配
 
@@ -283,14 +280,26 @@ pageConfigs: context => {
 ### 批量构建
 
 ```bash
-# 构建所有策略
+# 构建所有策略（默认扁平化输出）
 npx vite-mp
+
+# 禁用扁平化输出结构
+npx vite-mp --no-flatten
+
+# 控制并发构建数量
+npx vite-mp --concurrency 2
+
+# 构建指定策略
+npx vite-mp --strategy mobile,tablet
 
 # 传递额外的 Vite 参数
 npx vite-mp --host --port 3000
 
 # 启用调试模式
 npx vite-mp --debug
+
+# 组合使用
+npx vite-mp --concurrency 4 --debug
 ```
 
 ### 开发服务器
@@ -303,133 +312,95 @@ npm run dev
 npm run dev -- --strategy mobile
 ```
 
+### 静态资源预览
+
+构建完成后，可以使用多种方式预览静态资源：
+
+```bash
+# 使用 serve 工具（推荐）
+npx serve dist -p 3000
+
+# 使用 http-server
+npx http-server dist -p 3000
+
+# 使用 Python 简单服务器
+python -m http.server 3000 --directory dist
+
+# 使用 Node.js 简单服务器
+npx http-server dist
+```
+
+访问地址：
+
+- 默认（扁平化模式）：`http://localhost:3000/home.html`
+- 策略分组模式：`http://localhost:3000/default/home.html`（使用 `--no-flatten`）
+
 ## 使用示例
 
-### Page模式独立部署
+### 默认扁平化构建
 
-配置Page模式，每个页面获得完整的独立资源：
+插件默认使用扁平化输出构建多策略应用：
 
-```typescript
-// multipage.config.ts
-export default defineConfig({
-  entry: 'src/pages/**/*.{ts,js}',
-  template: 'index.html',
-  merge: 'page', // 启用Page模式
-  strategies: {
-    default: {
-      build: {
-        sourcemap: false,
-        minify: 'esbuild',
-      },
-    },
-    mobile: {
-      build: {
-        target: ['es2015'],
-        minify: 'terser',
-      },
-    },
-  },
-  pageConfigs: context => {
-    if (context.relativePath.includes('/mobile/')) {
-      return { strategy: 'mobile' };
-    }
-    return { strategy: 'default' };
-  },
-});
+```bash
+# 默认扁平化构建，所有文件在根目录
+npx vite-mp
+
+# 高并发扁平化构建
+npx vite-mp --concurrency 5
+
+# 只构建移动端和平板端策略（默认扁平化）
+npx vite-mp --strategy mobile,tablet
 ```
 
-构建结果：每个页面都有独立的资源文件，避免共享资源缺失问题。
+构建结果：
 
-### 共享资源处理
-
-在Page模式下，共享资源（如图标、样式文件）会被复制到每个页面目录：
-
-```typescript
-// src/pages/about/main.ts
-import buttonIcon from '../button-loading.svg'; // 共享资源
-
-// src/pages/mobile/main.ts
-import buttonIcon from '../button-loading.svg'; // 相同的共享资源
+```
+dist/
+├── home.html          # 默认策略页面
+├── about.html         # 默认策略页面
+├── mobile.html        # 移动端策略页面
+├── tablet.html        # 平板端策略页面
+├── assets/            # 统一资源目录
+│   ├── home-xxx.js
+│   ├── about-xxx.js
+│   ├── mobile-xxx.js
+│   ├── tablet-xxx.js
+│   └── shared-resource.svg
+├── images/
+├── favicon.ico
+└── some.css
 ```
 
-构建后两个页面都会有自己的资源副本：
+### 并发构建优化
 
-- `dist/about/assets/button-loading-xxx.svg`
-- `dist/mobile/assets/button-loading-xxx.svg`
+根据机器性能调整并发数：
+
+```bash
+# 低配置机器：串行构建
+npx vite-mp --concurrency 1
+
+# 高配置机器：高并发构建
+npx vite-mp --concurrency 8
+
+# 调试模式查看构建进度
+npx vite-mp --concurrency 4 --debug
+```
+
+### 生产环境部署
+
+```bash
+# 生产环境构建（默认扁平化）
+npx vite-mp --concurrency 4
+
+# 构建后可直接部署到CDN
+# 所有资源都在根目录，便于CDN配置
+```
 
 ## 环境变量
 
-- `VITE_BUILD_STRATEGY`: 指定单个策略构建
-- `VITE_MULTI_PAGE_BUILD_SINGLE_PAGE`: 指定单个页面构建（Page模式内部使用）
 - `VITE_MULTI_PAGE_STRATEGY`: 当前构建策略（自动设置）
-- `VITE_MULTI_PAGE_CURRENT_PAGE`: 当前页面名称（Page模式下自动设置）
-- `VITE_MULTI_PAGE_MERGE_MODE`: 当前合并模式（Page模式下自动设置）
 - `IS_MOBILE`: 移动端标识 (在 define 中配置)
 - `API_BASE`: API 基础地址 (在 define 中配置)
-
-### Page模式环境变量注入
-
-在Page模式（`merge: 'page'`）下，您可以通过 `pageEnvs` 函数为每个页面注入特定的环境变量：
-
-```typescript
-// multipage.config.ts
-export default defineConfig({
-  merge: 'page', // 启用Page模式
-
-  // 页面环境变量注入函数
-  pageEnvs: context => {
-    const { pageName, strategy, relativePath } = context;
-
-    // 返回该页面特定的环境变量
-    const envs: Record<string, string> = {
-      VITE_CURRENT_PAGE_NAME: pageName,
-      VITE_CURRENT_STRATEGY: strategy || 'default',
-      VITE_BUILD_TIMESTAMP: new Date().toISOString(),
-    };
-
-    // 根据页面路径添加特定变量
-    if (relativePath.includes('/mobile/')) {
-      envs.VITE_IS_MOBILE = 'true';
-      envs.VITE_API_URL = 'https://mobile-api.example.com';
-    }
-
-    return envs;
-  },
-});
-```
-
-#### 页面上下文 (PageContext)
-
-`pageEnvs` 函数接收一个页面上下文对象，包含以下信息：
-
-- `pageName`: 页面名称 (如 'home', 'mobile')
-- `strategy`: 分配给该页面的策略名称
-- `filePath`: 页面入口文件的绝对路径
-- `relativePath`: 页面入口文件的相对路径
-
-#### 使用场景
-
-1. **页面特定的API配置**: 为不同页面设置不同的API端点
-2. **页面标识**: 在运行时识别当前页面类型
-3. **构建信息**: 注入构建时间戳、版本号等信息
-4. **功能开关**: 为特定页面启用或禁用功能
-
-#### 在代码中使用
-
-注入的环境变量可以在代码中通过 `import.meta.env` 访问：
-
-```typescript
-// src/pages/mobile/main.ts
-console.log('当前页面:', import.meta.env.VITE_CURRENT_PAGE_NAME);
-console.log('当前策略:', import.meta.env.VITE_CURRENT_STRATEGY);
-console.log('构建时间:', import.meta.env.VITE_BUILD_TIMESTAMP);
-
-if (import.meta.env.VITE_IS_MOBILE === 'true') {
-  // 移动端特定逻辑
-}
-```
-
-**注意**: `pageEnvs` 功能仅在Page模式（`merge: 'page'`）下生效，因为only这种模式下每个页面是独立构建的。
 
 ## TypeScript 支持
 
@@ -453,33 +424,37 @@ export default config;
 
 ### 配置选项
 
-| 选项          | 类型                       | 默认值                     | 描述                               |
-| ------------- | -------------------------- | -------------------------- | ---------------------------------- |
-| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | 页面入口匹配规则                   |
-| `template`    | `string`                   | `'index.html'`             | HTML 模板文件                      |
-| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | 模板占位符                         |
-| `exclude`     | `string[]`                 | `[]`                       | 排除的文件模式                     |
-| `debug`       | `boolean`                  | `false`                    | 启用调试日志                       |
-| `merge`       | `'all' \| 'page'`          | `'all'`                    | 构建产物合并策略                   |
-| `strategies`  | `Record<string, Strategy>` | `{}`                       | 构建策略配置                       |
-| `pageConfigs` | `Function \| Object`       | `{}`                       | 页面配置                           |
-| `pageEnvs`    | `Function`                 | `() => null`               | 页面环境变量注入函数（仅Page模式） |
+| 选项          | 类型                       | 默认值                     | 描述             |
+| ------------- | -------------------------- | -------------------------- | ---------------- |
+| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | 页面入口匹配规则 |
+| `template`    | `string`                   | `'index.html'`             | HTML 模板文件    |
+| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | 模板占位符       |
+| `exclude`     | `string[]`                 | `[]`                       | 排除的文件模式   |
+| `debug`       | `boolean`                  | `false`                    | 启用调试日志     |
+| `strategies`  | `Record<string, Strategy>` | `{}`                       | 构建策略配置     |
+| `pageConfigs` | `Function \| Object`       | `{}`                       | 页面配置         |
+
+### CLI 参数
+
+| 参数            | 类型      | 默认值  | 描述                       |
+| --------------- | --------- | ------- | -------------------------- |
+| `--flatten`     | `boolean` | `true`  | 启用扁平化输出结构（默认） |
+| `--no-flatten`  | `boolean` | `false` | 禁用扁平化输出结构         |
+| `--concurrency` | `number`  | `3`     | 并发构建数量               |
+| `--strategy`    | `string`  | -       | 指定构建策略（可多次使用） |
+| `--debug`       | `boolean` | `false` | 启用调试模式               |
+| `--cwd`         | `string`  | -       | 指定工作目录               |
+| `--help`        | `boolean` | `false` | 显示帮助信息               |
 
 ### 工具函数
 
 ```typescript
-import { defineConfig, defineConfigTransform } from '@fchc8/vite-plugin-multi-page';
+import { defineConfig } from '@fchc8/vite-plugin-multi-page';
 
 // 定义配置
 export default defineConfig(context => ({
   // 配置选项
 }));
-
-// 配置转换
-const transform = defineConfigTransform((config, context) => {
-  // 修改配置
-  return config;
-});
 ```
 
 ## 示例项目

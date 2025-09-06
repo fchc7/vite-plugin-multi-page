@@ -7,11 +7,9 @@ export interface MultiPageOptions {
   template?: string;
   placeholder?: string;
   debug?: boolean;
-  merge?: 'all' | 'page'; // 构建产物合并模式
   strategies?: Record<string, ConfigStrategy>;
   buildStrategies?: Record<string, ConfigStrategy>; // 别名，等同于 strategies
   pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
-  pageEnvs?: PageEnvFunction; // 页面环境变量注入函数
   __forceBuildStrategy?: string;
 }
 
@@ -36,12 +34,9 @@ export interface BuildConfigOptions {
   exclude: string[];
   template: string;
   placeholder: string;
-  merge?: 'all' | 'page'; // 构建产物合并模式
   strategies?: Record<string, ConfigStrategy>;
   pageConfigs?: Record<string, PageConfig> | PageConfigFunction;
-  pageEnvs?: PageEnvFunction; // 页面环境变量注入函数
   forceBuildStrategy?: string;
-  forceBuildPage?: string; // 强制构建指定页面（用于单页面构建）
 }
 
 // 策略配置
@@ -71,9 +66,6 @@ export type PageConfigContext = PageContext;
 
 // 页面配置函数
 export type PageConfigFunction = (context: PageContext) => PageConfig | null;
-
-// 页面环境变量注入函数
-export type PageEnvFunction = (context: PageContext) => Record<string, string> | null;
 
 // 入口文件信息
 export interface EntryFile {

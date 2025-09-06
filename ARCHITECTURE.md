@@ -2,6 +2,8 @@
 
 本文档详细介绍 vite-plugin-multi-page 插件的架构设计、工作原理和实现细节。
 
+> **注意**: 本文档基于当前版本，已移除废弃的 Page 模式和 All 模式，专注于策略分组和扁平化输出。
+
 ## 整体架构
 
 ```
@@ -11,10 +13,10 @@
 │  配置加载器                 核心引擎                CLI工具   │
 │  ┌─────────────────┐      ┌─────────────────┐   ┌─────────┐  │
 │  │ config-loader   │─────▶│ index.ts        │   │ cli.ts  │  │
-│  │ - TypeScript    │      │ - Vite 插件     │   │ - 批量  │  │
+│  │ - TypeScript    │      │ - Vite 插件     │   │ - 并发  │  │
 │  │ - JavaScript    │      │ - 钩子管理      │   │   构建  │  │
-│  │ - esbuild 转译  │      │ - 配置合并      │   │ - 结果  │  │
-│  └─────────────────┘      └─────────────────┘   │   合并  │  │
+│  │ - esbuild 转译  │      │ - 配置合并      │   │ - 扁平  │  │
+│  └─────────────────┘      └─────────────────┘   │   化    │  │
 │                                   │              └─────────┘  │
 │  ┌─────────────────┐              │                          │
 │  │ 页面发现        │              │                          │
@@ -26,8 +28,9 @@
 │  ┌─────────────────┐              │                          │
 │  │ 构建配置生成    │              │                          │
 │  │ build-config.ts │◀─────────────┤                          │
-│  │ - 多策略配置    │              │                          │
-│  │ - 页面分组      │              │                          │
+│  │ - 策略分组      │              │                          │
+│  │ - 多入口构建    │              │                          │
+│  │ - 资源去重      │              │                          │
 │  └─────────────────┘              │                          │
 │                                   │                          │
 │  ┌─────────────────┐              │                          │
@@ -266,82 +269,151 @@ if (cliStrategy) {
 
 ### 5. CLI 工具 (cli.ts)
 
-#### 并行构建架构
+#### 并发构建架构
 
-CLI 工具采用并行构建 + 结果合并的架构：
+CLI 工具采用分批并发构建 + 扁平化处理的架构：
 
 ```typescript
-async function main() {
-  // 1. 加载配置，获取所有策略
-  const options = await loadViteConfig();
+async function buildStrategiesMode(
+  options,
+  viteBuildArgs,
+  debug,
+  specifiedStrategies,
+  concurrency,
+  flatten
+) {
+  // 1. 获取所有策略
   const strategies = getAvailableStrategies(options);
 
-  // 2. 并行构建所有策略
-  const buildPromises = strategies.map(strategy => buildStrategy(strategy, viteBuildArgs, debug));
-  const results = await Promise.all(buildPromises);
+  // 2. 分批并发构建策略
+  const results = [];
+  for (let i = 0; i < strategies.length; i += concurrency) {
+    const batch = strategies.slice(i, i + concurrency);
+    const batchPromises = batch.map(strategy => buildStrategy(strategy, viteBuildArgs, debug));
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+  }
 
-  // 3. 合并构建结果
-  await mergeResults(results, debug);
+  // 3. 扁平化处理（如果启用）
+  if (flatten) {
+    await flattenOutput(strategies, debug);
+  }
 
   // 4. 清理临时文件
   await cleanup(strategies, debug);
 }
 ```
 
-#### 结果合并算法
+#### 扁平化处理算法
 
 ```typescript
-async function mergeResults(results: BuildResult[], debug: boolean) {
-  const finalDist = 'dist';
-  const finalAssets = path.join(finalDist, 'assets');
+async function flattenOutput(strategies: string[], debug: boolean) {
+  const distDir = path.resolve(process.cwd(), 'dist');
 
-  for (const result of results) {
-    const strategyDist = `dist/${result.strategy}`;
-
-    // 1. 处理 HTML 文件
-    const htmlFiles = await glob('**/*.html', { cwd: strategyDist });
-    for (const htmlFile of htmlFiles) {
-      const targetPath = path.join(finalDist, path.basename(htmlFile));
-      await fs.copy(path.join(strategyDist, htmlFile), targetPath);
+  // 1. 收集所有HTML文件并移动到根目录
+  const htmlFiles = [];
+  for (const strategy of strategies) {
+    const strategyDir = path.resolve(distDir, strategy);
+    if (fs.existsSync(strategyDir)) {
+      const files = fs.readdirSync(strategyDir);
+      for (const file of files) {
+        if (file.endsWith('.html')) {
+          const sourcePath = path.resolve(strategyDir, file);
+          const targetPath = path.resolve(distDir, file);
+          fs.renameSync(sourcePath, targetPath);
+          htmlFiles.push(file);
+        }
+      }
     }
+  }
 
-    // 2. 合并 assets
-    const assetsDir = path.join(strategyDist, 'assets');
-    if (await fs.pathExists(assetsDir)) {
-      await mergeAssets(assetsDir, finalAssets, result.strategy);
+  // 2. 合并所有策略的assets文件到统一目录
+  const assetsDir = path.resolve(distDir, 'assets');
+  fs.mkdirSync(assetsDir, { recursive: true });
+  const processedAssets = new Set();
+
+  for (const strategy of strategies) {
+    const strategyDir = path.resolve(distDir, strategy);
+    if (fs.existsSync(strategyDir)) {
+      const strategyAssetsDir = path.resolve(strategyDir, 'assets');
+      if (fs.existsSync(strategyAssetsDir)) {
+        const files = fs.readdirSync(strategyAssetsDir);
+        for (const file of files) {
+          const sourcePath = path.resolve(strategyAssetsDir, file);
+          const targetPath = path.resolve(assetsDir, file);
+
+          if (!processedAssets.has(file)) {
+            // 文件不存在，直接移动
+            fs.renameSync(sourcePath, targetPath);
+            processedAssets.add(file);
+          } else {
+            // 文件已存在，比较文件内容决定是否替换
+            const sourceContent = fs.readFileSync(sourcePath);
+            const targetContent = fs.readFileSync(targetPath);
+
+            if (sourceContent.equals(targetContent)) {
+              // 内容相同，删除重复文件
+              fs.unlinkSync(sourcePath);
+            } else {
+              // 内容不同，添加策略前缀
+              const fileName = path.parse(file).name;
+              const fileExt = path.parse(file).ext;
+              const newFileName = `${fileName}-${strategy}${fileExt}`;
+              const newTargetPath = path.resolve(assetsDir, newFileName);
+              fs.renameSync(sourcePath, newTargetPath);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 3. 更新HTML文件中的资源路径
+  for (const htmlFile of htmlFiles) {
+    const htmlPath = path.resolve(distDir, htmlFile);
+    let content = fs.readFileSync(htmlPath, 'utf-8');
+
+    // 更新assets路径：从 ./assets/策略名/ 到 ./assets/
+    content = content.replace(/\.\/assets\/[^\/]+\//g, './assets/');
+
+    fs.writeFileSync(htmlPath, content);
+  }
+
+  // 4. 清理所有策略目录
+  for (const strategy of strategies) {
+    const strategyDir = path.resolve(distDir, strategy);
+    if (fs.existsSync(strategyDir)) {
+      fs.rmSync(strategyDir, { recursive: true });
     }
   }
 }
 ```
 
-#### 文件冲突处理
+#### 资源去重算法
+
+扁平化处理中的资源去重逻辑：
 
 ```typescript
-async function mergeAssets(sourceDir: string, targetDir: string, strategy: string) {
-  const files = await fs.readdir(sourceDir);
+// 资源去重处理
+if (!processedAssets.has(file)) {
+  // 文件不存在，直接移动
+  fs.renameSync(sourcePath, targetPath);
+  processedAssets.add(file);
+} else {
+  // 文件已存在，比较文件内容
+  const sourceContent = fs.readFileSync(sourcePath);
+  const targetContent = fs.readFileSync(targetPath);
 
-  for (const file of files) {
-    const sourcePath = path.join(sourceDir, file);
-    const targetPath = path.join(targetDir, file);
-
-    if (await fs.pathExists(targetPath)) {
-      // 文件已存在，检查内容是否相同
-      const sourceContent = await fs.readFile(sourcePath);
-      const targetContent = await fs.readFile(targetPath);
-
-      if (!sourceContent.equals(targetContent)) {
-        // 内容不同，添加策略后缀
-        const ext = path.extname(file);
-        const name = path.basename(file, ext);
-        const newName = `${name}-${strategy}${ext}`;
-        const newTargetPath = path.join(targetDir, newName);
-        await fs.copy(sourcePath, newTargetPath);
-      }
-      // 内容相同，跳过
-    } else {
-      // 文件不存在，直接复制
-      await fs.copy(sourcePath, targetPath);
-    }
+  if (sourceContent.equals(targetContent)) {
+    // 内容相同，删除重复文件
+    fs.unlinkSync(sourcePath);
+  } else {
+    // 内容不同，添加策略前缀
+    const fileName = path.parse(file).name;
+    const fileExt = path.parse(file).ext;
+    const newFileName = `${fileName}-${strategy}${fileExt}`;
+    const newTargetPath = path.resolve(assetsDir, newFileName);
+    fs.renameSync(sourcePath, newTargetPath);
   }
 }
 ```
@@ -372,11 +444,24 @@ async function mergeAssets(sourceDir: string, targetDir: string, strategy: strin
 - 页面级别的配置覆盖
 - 灵活的策略分配规则
 
-### 4. 为什么选择并行构建而不是单次构建？
+### 4. 为什么选择策略分组而不是页面独立构建？
 
-- **隔离性**：每个策略独立构建，避免配置污染
-- **可靠性**：单个策略失败不影响其他策略
-- **可扩展性**：容易添加新的策略处理逻辑
+- **效率性**：同一策略的多个页面共享构建配置，减少重复工作
+- **一致性**：确保同一策略下的页面使用相同的构建参数
+- **可维护性**：策略级别的配置更容易管理和更新
+
+### 5. 为什么默认启用扁平化输出？
+
+- **部署简化**：所有文件在根目录，部署更简单
+- **资源优化**：自动去重相同内容的资源文件
+- **CDN友好**：统一的资源目录便于CDN配置
+- **用户体验**：减少用户配置，开箱即用
+
+### 6. 为什么采用分批并发而不是全量并发？
+
+- **资源控制**：避免同时构建过多策略导致系统资源过载
+- **稳定性**：分批处理降低构建失败的风险
+- **可配置性**：用户可以根据机器性能调整并发数量
 
 ## 性能优化
 
@@ -416,12 +501,31 @@ function filterEntryFiles(files: string[], entry: string, exclude: string[]) {
 }
 ```
 
-### 3. 并行资源处理
+### 3. 并发构建控制
 
 ```typescript
-// 并行处理多个策略的资源合并
-const mergePromises = results.map(result => mergeStrategyAssets(result.strategy));
-await Promise.all(mergePromises);
+// 分批并发构建，避免资源过载
+for (let i = 0; i < strategies.length; i += concurrency) {
+  const batch = strategies.slice(i, i + concurrency);
+  const batchPromises = batch.map(strategy => buildStrategy(strategy, viteBuildArgs, debug));
+  const batchResults = await Promise.all(batchPromises);
+  results.push(...batchResults);
+}
+```
+
+### 4. 资源去重优化
+
+```typescript
+// 使用 Set 记录已处理的资源，避免重复处理
+const processedAssets = new Set<string>();
+
+// 内容比较去重，减少存储空间
+if (sourceContent.equals(targetContent)) {
+  fs.unlinkSync(sourcePath); // 删除重复文件
+} else {
+  // 重命名避免冲突
+  const newFileName = `${fileName}-${strategy}${fileExt}`;
+}
 ```
 
 ## 错误处理
@@ -491,5 +595,32 @@ viteMultiPage({
   discoveryRules: [customRule],
 });
 ```
+
+## 当前版本特性
+
+### 1. 策略分组构建
+
+- 按策略分组页面，每个策略独立构建
+- 支持多入口构建，同一策略的多个页面共享构建配置
+- 用户配置优先级高于插件默认配置
+
+### 2. 扁平化输出（默认）
+
+- 默认启用扁平化输出模式，简化部署结构
+- 自动资源去重，减少构建产物大小
+- 智能路径更新，确保资源引用正确
+- 支持 `--no-flatten` 参数禁用扁平化
+
+### 3. 并发构建控制
+
+- 支持控制并发构建数量，避免系统资源过载
+- 分批处理策略，提高构建稳定性
+- 调试模式显示构建进度
+
+### 4. 配置灵活性
+
+- 支持 TypeScript 和 JavaScript 配置文件
+- 使用 Vite 的 `mergeConfig` 进行智能配置合并
+- 保护关键配置不被用户覆盖
 
 这种架构设计确保了插件的高性能、可扩展性和可维护性，同时提供了丰富的功能和良好的用户体验。

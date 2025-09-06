@@ -11,7 +11,9 @@ A powerful Vite plugin for multi-page application development, providing multi-s
 - 📝 **TypeScript configuration**: Support TypeScript configuration files
 - 🚀 **CLI tool**: Provide command-line batch build tools
 - 🔄 **Hot reload**: Development server supports page hot reload
-- 📦 **Smart merge**: Automatically merge multi-strategy build results
+- 📦 **Flattened output**: Support flattened build results to reduce directory levels
+- ⚡ **Concurrent builds**: Support controlling concurrent build count to improve build efficiency
+- 🗂️ **Resource deduplication**: Automatically deduplicate shared resources to reduce build output size
 
 ## Install
 
@@ -60,20 +62,10 @@ export default defineConfig(() => ({}));
 Create `multipage.config.ts` or `multipage.config.js`:
 
 ```typescript
-import { defineConfig } from 'vite-plugin-multi-page';
+import { defineConfig } from '@fchc8/vite-plugin-multi-page';
 
-// Method 1: Object Configuration (Recommended)
-export default defineConfig({
-  entry: 'src/pages/**/*.{ts,js}',
-  template: 'index.html',
-  strategies: {
-    // Strategy Configuration...
-  },
-});
-
-// Method 2: Function Configuration (Dynamic Configuration)
 export default defineConfig(context => {
-  const { mode, command, isCLI } = context;
+  const { mode } = context;
   const isProduction = mode === 'production';
 
   return {
@@ -83,14 +75,8 @@ export default defineConfig(context => {
     // HTML Template
     template: 'index.html',
 
-    // Template Placeholder
-    placeholder: '{{ENTRY_FILE}}',
-
     // Excluded Files
     exclude: ['src/shared/**/*.ts'],
-
-    // Debug Mode
-    debug: !isProduction || isCLI,
 
     // Build Strategy
     strategies: {
@@ -121,25 +107,10 @@ export default defineConfig(context => {
 
     // Page Configuration Function
     pageConfigs: context => {
-      // Determine the strategy based on the file path
       if (context.relativePath.includes('/mobile/')) {
-        return {
-          strategy: 'mobile',
-          define: {
-            PAGE_NAME: context.pageName,
-            MOBILE_PAGE: true,
-          },
-        };
+        return { strategy: 'mobile' };
       }
-
-      // Default Strategy
-      return {
-        strategy: 'default',
-        define: {
-          PAGE_NAME: context.pageName,
-          DEFAULT_PAGE: true,
-        },
-      };
+      return { strategy: 'default' };
     },
   };
 });
@@ -149,16 +120,14 @@ export default defineConfig(context => {
 
 Create page files according to the convention:
 
-**Note**: Even if you use the empty configuration `defineConfig({})`, the plugin will automatically use the default strategy to process all pages, ensuring maximum compatibility.
-
 ```
 src/pages/
 ├── home.js                    # → /home.html
-├── about.js                   # → /about.html (Default Strategy)
+├── about.js                   # → /about.html
 ├── mobile/
 │   └── main.ts               # → /mobile.html (Mobile Strategy)
 └── admin/
-    └── main.ts               # → /admin.html (Admin Strategy)
+    └── main.ts               # → /admin.html
 ```
 
 ## Page Discovery Rules
@@ -196,67 +165,95 @@ strategies: {
 }
 ```
 
-### Build Output Merge Strategy
+### Build Output Organization Strategy
 
-Control how build outputs are organized using the `merge` option:
+#### Strategy Grouping Mode (Default)
 
-```typescript
-export default defineConfig({
-  // ... other configurations
-  merge: 'all' | 'page',
-});
+By default, build results are grouped by strategy:
+
+```
+dist/
+├── default/
+│   ├── home.html
+│   ├── about.html
+│   ├── assets/
+│   │   ├── home-xxx.js
+│   │   ├── about-xxx.js
+│   │   └── shared-resource.svg
+│   └── images/
+├── mobile/
+│   ├── mobile.html
+│   ├── assets/
+│   │   ├── mobile-xxx.js
+│   │   └── button-loading.svg
+│   └── images/
+└── tablet/
+    ├── tablet.html
+    ├── assets/
+    │   ├── tablet-xxx.js
+    │   └── button-loading.svg
+    └── images/
 ```
 
-#### Available Modes
+#### Flattened Mode (Default)
 
-- **`all`** (default): All HTML files in root directory, assets merged into `/dist/assets/`
+Flattened output is enabled by default. Use the `--no-flatten` parameter to disable it:
 
-  ```
-  dist/
-  ├── home.html
-  ├── about.html
-  ├── mobile.html
-  └── assets/
-      ├── home-xxx.js
-      ├── about-xxx.js
-      └── shared-resource.svg
-  ```
+```bash
+# Default behavior (flattened output)
+npx vite-mp
 
-- **`page`**: Each page is independently packaged with its own complete set of resource copies
-  ```
-  dist/
-  ├── home/
-  │   ├── index.html
-  │   ├── assets/
-  │   │   ├── home-xxx.js
-  │   │   └── button-loading.svg
-  │   └── images/
-  ├── about/
-  │   ├── index.html
-  │   ├── assets/
-  │   │   ├── about-xxx.js
-  │   │   └── button-loading.svg
-  │   └── images/
-  └── mobile/
-      ├── index.html
-      ├── assets/
-      │   ├── mobile-xxx.js
-      │   └── button-loading.svg
-      └── images/
-  ```
+# Disable flattened output
+npx vite-mp --no-flatten
+```
 
-#### Advantages of Page Mode
+Flattened structure:
 
-- ✅ **Fully Independent**: Each page directory contains all required resources, can be deployed independently
-- ✅ **Avoid Conflicts**: Completely resolves shared resource attribution issues
-- ✅ **Clean Naming**: Resource files use clean file names without page prefixes
-- ✅ **Deployment Friendly**: Supports CDN distribution, micro-frontend architectures
+```
+dist/
+├── home.html
+├── about.html
+├── mobile.html
+├── tablet.html
+├── assets/
+│   ├── home-xxx.js
+│   ├── about-xxx.js
+│   ├── mobile-xxx.js
+│   ├── tablet-xxx.js
+│   └── shared-resource.svg
+├── images/
+├── favicon.ico
+└── some.css
+```
 
-> **Note**:
->
-> - Page mode creates resource copies for each page, which may increase overall build output size
-> - Suitable for scenarios requiring independent deployment or strict resource isolation
-> - Static assets from the `public/` directory are automatically copied to each page directory
+#### Advantages of Flattened Mode
+
+- ✅ **Simplified Deployment**: All files in root directory, easier deployment
+- ✅ **Resource Deduplication**: Automatically deduplicate identical resource files
+- ✅ **Reduced Hierarchy**: Avoid deeply nested directory structures
+- ✅ **Unified Management**: All resources centrally managed, easy CDN configuration
+
+### Concurrent Build Control
+
+Control concurrent build count through the `--concurrency` parameter:
+
+```bash
+# Default concurrency is 3
+npx vite-mp
+
+# Set concurrency to 1 (serial build)
+npx vite-mp --concurrency 1
+
+# Set concurrency to 5 (high concurrency)
+npx vite-mp --concurrency 5
+```
+
+#### Advantages of Concurrent Builds
+
+- ⚡ **Improved Efficiency**: Multi-strategy parallel builds, reduce total build time
+- 🔧 **Resource Control**: Avoid overloading system resources with too many concurrent builds
+- 🎯 **Flexible Configuration**: Adjust concurrency based on machine performance
+- 📊 **Progress Visibility**: Debug mode shows batch build progress
 
 ### Page Strategy Assignment
 
@@ -283,14 +280,26 @@ pageConfigs: context => {
 ### Batch Build
 
 ```bash
-# Build all strategies
+# Build all strategies (default flattened output)
 npx vite-mp
+
+# Disable flattened output structure
+npx vite-mp --no-flatten
+
+# Control concurrent build count
+npx vite-mp --concurrency 2
+
+# Build specified strategies
+npx vite-mp --strategy mobile,tablet
 
 # Pass additional Vite parameters
 npx vite-mp --host --port 3000
 
 # Enable debug mode
 npx vite-mp --debug
+
+# Combined usage
+npx vite-mp --concurrency 4 --debug
 ```
 
 ### Development Server
@@ -303,133 +312,95 @@ npm run dev
 npm run dev -- --strategy mobile
 ```
 
+### Static Resource Preview
+
+After building, you can preview static resources in multiple ways:
+
+```bash
+# Using serve tool (recommended)
+npx serve dist -p 3000
+
+# Using http-server
+npx http-server dist -p 3000
+
+# Using Python simple server
+python -m http.server 3000 --directory dist
+
+# Using Node.js simple server
+npx http-server dist
+```
+
+Access URLs:
+
+- Default (flattened mode): `http://localhost:3000/home.html`
+- Strategy grouping mode: `http://localhost:3000/default/home.html` (use `--no-flatten`)
+
 ## Usage Examples
 
-### Page Mode for Independent Deployment
+### Default Flattened Build
 
-Configure Page mode where each page gets complete independent resources:
+The plugin uses flattened output by default for multi-strategy applications:
 
-```typescript
-// multipage.config.ts
-export default defineConfig({
-  entry: 'src/pages/**/*.{ts,js}',
-  template: 'index.html',
-  merge: 'page', // Enable Page mode
-  strategies: {
-    default: {
-      build: {
-        sourcemap: false,
-        minify: 'esbuild',
-      },
-    },
-    mobile: {
-      build: {
-        target: ['es2015'],
-        minify: 'terser',
-      },
-    },
-  },
-  pageConfigs: context => {
-    if (context.relativePath.includes('/mobile/')) {
-      return { strategy: 'mobile' };
-    }
-    return { strategy: 'default' };
-  },
-});
+```bash
+# Default flattened build, all files in root directory
+npx vite-mp
+
+# High concurrency flattened build
+npx vite-mp --concurrency 5
+
+# Only build mobile and tablet strategies (flattened by default)
+npx vite-mp --strategy mobile,tablet
 ```
 
-Build result: Each page has independent resource files, avoiding shared resource missing issues.
+Build result:
 
-### Shared Resource Handling
-
-In Page mode, shared resources (such as icons, style files) are copied to each page directory:
-
-```typescript
-// src/pages/about/main.ts
-import buttonIcon from '../button-loading.svg'; // Shared resource
-
-// src/pages/mobile/main.ts
-import buttonIcon from '../button-loading.svg'; // Same shared resource
+```
+dist/
+├── home.html          # Default strategy page
+├── about.html         # Default strategy page
+├── mobile.html        # Mobile strategy page
+├── tablet.html        # Tablet strategy page
+├── assets/            # Unified resource directory
+│   ├── home-xxx.js
+│   ├── about-xxx.js
+│   ├── mobile-xxx.js
+│   ├── tablet-xxx.js
+│   └── shared-resource.svg
+├── images/
+├── favicon.ico
+└── some.css
 ```
 
-After building, both pages will have their own resource copies:
+### Concurrent Build Optimization
 
-- `dist/about/assets/button-loading-xxx.svg`
-- `dist/mobile/assets/button-loading-xxx.svg`
+Adjust concurrency based on machine performance:
+
+```bash
+# Low-spec machine: serial build
+npx vite-mp --concurrency 1
+
+# High-spec machine: high concurrency build
+npx vite-mp --concurrency 8
+
+# Debug mode to view build progress
+npx vite-mp --concurrency 4 --debug
+```
+
+### Production Environment Deployment
+
+```bash
+# Production environment build (flattened by default)
+npx vite-mp --concurrency 4
+
+# After building, can be directly deployed to CDN
+# All resources are in root directory, easy CDN configuration
+```
 
 ## Environment Variables
 
-- `VITE_BUILD_STRATEGY`: Specify a single strategy build
-- `VITE_MULTI_PAGE_BUILD_SINGLE_PAGE`: Specify single page build (used internally by Page mode)
 - `VITE_MULTI_PAGE_STRATEGY`: Current build strategy (automatically set)
-- `VITE_MULTI_PAGE_CURRENT_PAGE`: Current page name (automatically set in Page mode)
-- `VITE_MULTI_PAGE_MERGE_MODE`: Current merge mode (automatically set in Page mode)
 - `IS_MOBILE`: Mobile identifier (configured in define)
 - `API_BASE`: API base address (configured in define)
-
-### Page Mode Environment Variable Injection
-
-In Page mode (`merge: 'page'`), you can inject specific environment variables for each page through the `pageEnvs` function:
-
-```typescript
-// multipage.config.ts
-export default defineConfig({
-  merge: 'page', // Enable Page mode
-
-  // Page environment variable injection function
-  pageEnvs: context => {
-    const { pageName, strategy, relativePath } = context;
-
-    // Return page-specific environment variables
-    const envs: Record<string, string> = {
-      VITE_CURRENT_PAGE_NAME: pageName,
-      VITE_CURRENT_STRATEGY: strategy || 'default',
-      VITE_BUILD_TIMESTAMP: new Date().toISOString(),
-    };
-
-    // Add specific variables based on page path
-    if (relativePath.includes('/mobile/')) {
-      envs.VITE_IS_MOBILE = 'true';
-      envs.VITE_API_URL = 'https://mobile-api.example.com';
-    }
-
-    return envs;
-  },
-});
-```
-
-#### Page Context
-
-The `pageEnvs` function receives a page context object containing the following information:
-
-- `pageName`: Page name (e.g., 'home', 'mobile')
-- `strategy`: Strategy name assigned to this page
-- `filePath`: Absolute path of the page entry file
-- `relativePath`: Relative path of the page entry file
-
-#### Use Cases
-
-1. **Page-specific API configuration**: Set different API endpoints for different pages
-2. **Page identification**: Identify the current page type at runtime
-3. **Build information**: Inject build timestamps, version numbers, etc.
-4. **Feature flags**: Enable or disable features for specific pages
-
-#### Usage in Code
-
-Injected environment variables can be accessed in code via `import.meta.env`:
-
-```typescript
-// src/pages/mobile/main.ts
-console.log('Current page:', import.meta.env.VITE_CURRENT_PAGE_NAME);
-console.log('Current strategy:', import.meta.env.VITE_CURRENT_STRATEGY);
-console.log('Build time:', import.meta.env.VITE_BUILD_TIMESTAMP);
-
-if (import.meta.env.VITE_IS_MOBILE === 'true') {
-  // Mobile-specific logic
-}
-```
-
-**Note**: The `pageEnvs` feature only works in Page mode (`merge: 'page'`) because only in this mode each page is built independently.
 
 ## TypeScript Support
 
@@ -453,33 +424,37 @@ export default config;
 
 ### Configuration Options
 
-| Option        | Type                       | Default Value              | Description                                                   |
-| ------------- | -------------------------- | -------------------------- | ------------------------------------------------------------- |
-| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | Page entry matching rules                                     |
-| `template`    | `string`                   | `'index.html'`             | HTML Template File                                            |
-| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | Template placeholder                                          |
-| `exclude`     | `string[]`                 | `[]`                       | Excluded file patterns                                        |
-| `debug`       | `boolean`                  | `false`                    | Enable debug logging                                          |
-| `merge`       | `'all' \| 'page'`          | `'all'`                    | Build output merge strategy                                   |
-| `strategies`  | `Record<string, Strategy>` | `{}`                       | Build strategy configuration                                  |
-| `pageConfigs` | `Function \| Object`       | `{}`                       | Page configuration                                            |
-| `pageEnvs`    | `Function`                 | `() => null`               | Page environment variable injection function (Page mode only) |
+| Option        | Type                       | Default Value              | Description                  |
+| ------------- | -------------------------- | -------------------------- | ---------------------------- |
+| `entry`       | `string`                   | `'src/pages/**/*.{ts,js}'` | Page entry matching rules    |
+| `template`    | `string`                   | `'index.html'`             | HTML Template File           |
+| `placeholder` | `string`                   | `'{{ENTRY_FILE}}'`         | Template placeholder         |
+| `exclude`     | `string[]`                 | `[]`                       | Excluded file patterns       |
+| `debug`       | `boolean`                  | `false`                    | Enable debug logging         |
+| `strategies`  | `Record<string, Strategy>` | `{}`                       | Build strategy configuration |
+| `pageConfigs` | `Function \| Object`       | `{}`                       | Page configuration           |
+
+### CLI Parameters
+
+| Parameter       | Type      | Default Value | Description                                           |
+| --------------- | --------- | ------------- | ----------------------------------------------------- |
+| `--flatten`     | `boolean` | `true`        | Enable flattened output structure (default)           |
+| `--no-flatten`  | `boolean` | `false`       | Disable flattened output structure                    |
+| `--concurrency` | `number`  | `3`           | Concurrent build count                                |
+| `--strategy`    | `string`  | -             | Specify build strategies (can be used multiple times) |
+| `--debug`       | `boolean` | `false`       | Enable debug mode                                     |
+| `--cwd`         | `string`  | -             | Specify working directory                             |
+| `--help`        | `boolean` | `false`       | Show help information                                 |
 
 ### Utility Functions
 
 ```typescript
-import { defineConfig, defineConfigTransform } from '@fchc8/vite-plugin-multi-page';
+import { defineConfig } from '@fchc8/vite-plugin-multi-page';
 
 // Define configuration
 export default defineConfig(context => ({
   // Configuration options
 }));
-
-// Configuration transformation
-const transform = defineConfigTransform((config, context) => {
-  // Modify configuration
-  return config;
-});
 ```
 
 ## Example Project

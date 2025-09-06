@@ -21,7 +21,6 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
     strategies = {},
     pageConfigs = {},
     forceBuildStrategy,
-    forceBuildPage,
   } = options;
 
   const log = createLogger(true);
@@ -62,34 +61,7 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
 
     log(`📄 发现 ${entryFiles.length} 个页面: ${entryFiles.map(f => f.name).join(', ')}`);
 
-    // 3. 如果指定了强制页面，只构建该页面
-    if (forceBuildPage) {
-      const targetEntry = entryFiles.find(f => f.name === forceBuildPage);
-      if (!targetEntry) {
-        log(`警告: 未找到页面 "${forceBuildPage}"`);
-        return {};
-      }
-
-      // 获取该页面的策略
-      const pageStrategy = pageStrategies.get(forceBuildPage) || 'default';
-      const strategyConfig = strategies[pageStrategy] || {};
-
-      const config = generateStrategyConfig(
-        `single-${forceBuildPage}`,
-        [forceBuildPage],
-        entryFiles,
-        strategyConfig,
-        pageConfigs,
-        template,
-        placeholder,
-        log
-      );
-
-      buildConfigs[`single-${forceBuildPage}`] = config;
-      return buildConfigs;
-    }
-
-    // 4. 如果指定了强制策略，只构建该策略的页面
+    // 3. 如果指定了强制策略，只构建该策略的页面
     if (forceBuildStrategy) {
       const targetPages = strategyPages.get(forceBuildStrategy) || [];
       if (targetPages.length === 0) {
@@ -114,7 +86,7 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
       return buildConfigs;
     }
 
-    // 5. 为每个策略生成构建配置
+    // 4. 为每个策略生成构建配置
     for (const [strategyName, pages] of strategyPages) {
       if (pages.length === 0) continue;
 
@@ -242,9 +214,11 @@ function generateStrategyConfig(
     htmlInputs[pageName] = tempHtmlPath;
   }
 
-  // 构建基础配置 - 不设置 outDir，让 Vite 使用默认配置
+  // 构建基础配置 - 直接输出到策略目录
   const baseConfig: UserConfig = {
+    base: './', // 使用相对路径，支持子目录部署
     build: {
+      outDir: `dist/${strategyName}`, // 直接输出到策略目录
       rollupOptions: {
         input: htmlInputs, // 使用临时HTML文件作为输入
         output: {

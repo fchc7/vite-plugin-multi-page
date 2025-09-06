@@ -12,13 +12,6 @@ interface BuildResult {
   outputDir: string;
 }
 
-interface PageBuildResult {
-  pageName: string;
-  success: boolean;
-  error?: string;
-  outputDir: string;
-}
-
 /**
  * 解析命令行参数
  */
@@ -27,12 +20,16 @@ function parseArgs(): {
   debug: boolean;
   cwd?: string;
   strategies?: string[];
+  concurrency: number;
+  flatten: boolean;
 } {
   const args = process.argv.slice(2);
   const viteBuildArgs: string[] = [];
   let debug = false;
   let cwd: string | undefined;
   let strategies: string[] | undefined;
+  let concurrency = 3;
+  let flatten = true; // 默认启用扁平化模式
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -43,6 +40,17 @@ function parseArgs(): {
     } else if (arg === '--strategy') {
       const strategyArg = args[++i]; // 获取策略参数
       strategies = strategyArg.split(',').map(s => s.trim()); // 支持逗号分隔的多策略
+    } else if (arg === '--concurrency') {
+      const concurrencyArg = args[++i]; // 获取并发数参数
+      concurrency = parseInt(concurrencyArg, 10);
+      if (isNaN(concurrency) || concurrency < 1) {
+        console.error('❌ 并发数必须是大于0的整数');
+        process.exit(1);
+      }
+    } else if (arg === '--flatten') {
+      flatten = true;
+    } else if (arg === '--no-flatten') {
+      flatten = false;
     } else if (arg === '--help' || arg === '-h') {
       console.log(`
 使用方法: vite-mp [选项]
@@ -51,14 +59,19 @@ function parseArgs(): {
   --debug              启用调试模式
   --cwd <dir>          指定工作目录
   --strategy <list>    指定构建策略，支持逗号分隔多个策略
+  --concurrency <num>  并发构建数（默认：3）
+  --flatten            扁平化输出结构（默认启用）
+  --no-flatten         禁用扁平化输出结构
   --help, -h           显示帮助信息
   
 其他所有参数将传递给 vite build 命令
 
 示例:
-  vite-mp                              # 构建所有策略
+  vite-mp                              # 构建所有策略（默认扁平化）
   vite-mp --strategy mobile            # 只构建mobile策略
   vite-mp --strategy mobile,tablet     # 构建mobile和tablet策略
+  vite-mp --no-flatten                 # 禁用扁平化输出结构
+  vite-mp --concurrency 2              # 设置并发数为2
   vite-mp --debug                      # 启用调试模式
   vite-mp --cwd example                # 在example目录运行
   vite-mp --mode production --debug    # 传递额外参数给vite
@@ -70,7 +83,7 @@ function parseArgs(): {
     }
   }
 
-  return { viteBuildArgs, debug, cwd, strategies };
+  return { viteBuildArgs, debug, cwd, strategies, concurrency, flatten };
 }
 
 /**
@@ -111,8 +124,6 @@ function buildStrategy(
   return new Promise(resolve => {
     const log = debug ? console.log.bind(console, `[${strategy}]`) : () => {};
 
-    log(`开始构建策略: ${strategy}`);
-
     // 设置环境变量来指定构建策略
     const env = {
       ...process.env,
@@ -121,8 +132,6 @@ function buildStrategy(
 
     // 构建命令
     const args = ['build', ...viteBuildArgs];
-
-    log(`执行命令: npx vite ${args.join(' ')}`);
 
     // 在Windows环境下，使用shell选项来确保npx命令能够正确执行
     const child = spawn('npx', ['vite', ...args], {
@@ -143,12 +152,10 @@ function buildStrategy(
     child.on('close', code => {
       const success = code === 0;
 
-      // 获取实际的输出目录
-      const actualOutputDir = getViteOutputDirectory(viteBuildArgs);
+      // 获取实际的输出目录（策略目录）
+      const actualOutputDir = path.resolve(process.cwd(), 'dist', strategy);
 
       if (success) {
-        log(`✅ 策略 ${strategy} 构建成功`);
-
         // 重命名HTML文件：.temp.mp.[name].html -> [name].html
         try {
           if (fs.existsSync(actualOutputDir)) {
@@ -161,7 +168,6 @@ function buildStrategy(
                 const newName = `${name}.html`;
                 const newPath = path.resolve(actualOutputDir, newName);
                 fs.renameSync(oldPath, newPath);
-                log(`重命名HTML: ${file} -> ${newName}`);
               }
             }
           }
@@ -169,7 +175,6 @@ function buildStrategy(
           log(`重命名HTML文件失败:`, error);
         }
       } else {
-        log(`❌ 策略 ${strategy} 构建失败 (退出码: ${code})`);
         if (!debug && errorOutput) {
           console.error(`策略 ${strategy} 错误输出:`, errorOutput);
         }
@@ -197,377 +202,6 @@ function buildStrategy(
 }
 
 /**
- * 执行单个页面的构建（用于page模式）
- */
-function buildSinglePage(
-  pageName: string,
-  viteBuildArgs: string[],
-  debug: boolean,
-  pageStrategy: string,
-  options: any,
-  page: any
-): Promise<PageBuildResult> {
-  return new Promise(resolve => {
-    const log = debug ? console.log.bind(console, `[${pageName}]`) : () => {};
-
-    log(`开始构建页面: ${pageName}`);
-
-    // 每个页面使用独立的临时输出目录
-    const tempOutputDir = path.resolve(process.cwd(), `dist-temp-${pageName}`);
-
-    // 准备基础环境变量
-    const baseEnv = {
-      ...process.env,
-      VITE_MULTI_PAGE_BUILD_SINGLE_PAGE: pageName,
-      VITE_MULTI_PAGE_TEMP_OUTPUT_DIR: tempOutputDir,
-      VITE_MULTI_PAGE_STRATEGY: pageStrategy,
-      VITE_MULTI_PAGE_CURRENT_PAGE: pageName, // 添加当前页面名称
-      VITE_MULTI_PAGE_MERGE_MODE: options.merge || 'all', // 添加合并模式
-    };
-
-    // 如果配置了pageEnvs函数，获取页面特定的环境变量
-    if (options.pageEnvs && typeof options.pageEnvs === 'function') {
-      try {
-        // 构建页面上下文
-        const pageContext = {
-          pageName,
-          filePath: page.file,
-          relativePath: path.relative(process.cwd(), page.file),
-          strategy: pageStrategy,
-        };
-
-        const customEnvs = options.pageEnvs(pageContext);
-        if (customEnvs && typeof customEnvs === 'object') {
-          // 合并自定义环境变量，确保值是有效的字符串
-          for (const [key, value] of Object.entries(customEnvs)) {
-            baseEnv[key] = String(value);
-          }
-          log(`注入自定义环境变量:`, Object.keys(customEnvs));
-        }
-      } catch (error) {
-        log(`警告: 获取页面环境变量失败:`, error);
-      }
-    }
-
-    // 构建命令，添加 --outDir 参数
-    const args = ['build', '--outDir', tempOutputDir, ...viteBuildArgs];
-
-    log(`执行命令: npx vite ${args.join(' ')}`);
-
-    // 在Windows环境下，使用shell选项来确保npx命令能够正确执行
-    const child = spawn('npx', ['vite', ...args], {
-      stdio: debug ? 'inherit' : 'pipe',
-      env: baseEnv,
-      cwd: process.cwd(),
-      shell: process.platform === 'win32', // Windows下使用shell
-    });
-
-    let errorOutput = '';
-
-    if (!debug) {
-      child.stderr?.on('data', data => {
-        errorOutput += data.toString();
-      });
-    }
-
-    child.on('close', code => {
-      const success = code === 0;
-
-      if (success) {
-        log(`✅ 页面 ${pageName} 构建成功`);
-      } else {
-        log(`❌ 页面 ${pageName} 构建失败 (退出码: ${code})`);
-        if (!debug && errorOutput) {
-          console.error(`页面 ${pageName} 错误输出:`, errorOutput);
-        }
-      }
-
-      resolve({
-        pageName,
-        success,
-        error: success ? undefined : errorOutput || `构建失败，退出码: ${code}`,
-        outputDir: tempOutputDir,
-      });
-    });
-
-    child.on('error', error => {
-      log(`❌ 页面 ${pageName} 构建出错:`, error.message);
-      resolve({
-        pageName,
-        success: false,
-        error: error.message,
-        outputDir: tempOutputDir,
-      });
-    });
-  });
-}
-
-/**
- * 合并构建结果
- */
-async function mergeResults(results: BuildResult[], options: any, debug: boolean): Promise<void> {
-  const log = debug ? console.log.bind(console, '[merge]') : () => {};
-
-  log('开始合并构建结果...');
-
-  const mergeMode = options.merge || 'all';
-  log(`使用合并模式: ${mergeMode}`);
-
-  if (mergeMode === 'all') {
-    // 默认模式：所有HTML文件放在根目录，assets合并
-    await mergeResultsAll(results, debug);
-  } else if (mergeMode === 'page') {
-    // page 模式：使用插件的资源重组逻辑
-    await mergeResultsWithReorganization(results, options, debug);
-  }
-}
-
-/**
- * 合并页面构建结果（用于page模式）
- */
-async function mergePageResults(
-  results: PageBuildResult[],
-  options: any,
-  debug: boolean
-): Promise<void> {
-  const log = debug ? console.log.bind(console, '[merge]') : () => {};
-
-  const distDir = path.resolve(process.cwd(), 'dist');
-
-  // 创建临时目录用于重组（在当前目录而不是在dist目录下）
-  const tempMergeDir = path.resolve(process.cwd(), '.temp-merge');
-  if (fs.existsSync(tempMergeDir)) {
-    fs.rmSync(tempMergeDir, { recursive: true, force: true });
-  }
-  fs.mkdirSync(tempMergeDir, { recursive: true });
-
-  // 处理每个页面的构建结果
-  for (const result of results) {
-    if (!result.success) continue;
-
-    const sourceDir = result.outputDir;
-
-    if (!fs.existsSync(sourceDir)) {
-      log(`警告: 页面构建目录不存在: ${sourceDir}`);
-      continue;
-    }
-
-    // 创建页面临时目录
-    const tempPageDir = path.resolve(tempMergeDir, result.pageName);
-    fs.mkdirSync(tempPageDir, { recursive: true });
-
-    // 复制所有文件到临时页面目录
-    const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const sourcePath = path.resolve(sourceDir, entry.name);
-
-      if (entry.isFile()) {
-        if (entry.name.endsWith('.html')) {
-          // HTML文件重命名为index.html
-          const finalTargetPath = path.resolve(tempPageDir, 'index.html');
-          fs.copyFileSync(sourcePath, finalTargetPath);
-        } else {
-          // 其他文件直接复制
-          const targetPath = path.resolve(tempPageDir, entry.name);
-          fs.copyFileSync(sourcePath, targetPath);
-        }
-      } else if (entry.isDirectory()) {
-        // 目录递归复制，但不包含以页面名命名的子目录
-        if (entry.name === result.pageName) {
-          // 如果是同名子目录，复制其内容而非目录本身
-          const subEntries = fs.readdirSync(sourcePath, { withFileTypes: true });
-          for (const subEntry of subEntries) {
-            const subSourcePath = path.resolve(sourcePath, subEntry.name);
-            const subTargetPath = path.resolve(tempPageDir, subEntry.name);
-            if (subEntry.isFile()) {
-              fs.copyFileSync(subSourcePath, subTargetPath);
-            } else if (subEntry.isDirectory()) {
-              fs.cpSync(subSourcePath, subTargetPath, { recursive: true });
-            }
-          }
-        } else {
-          // 普通目录递归复制
-          const targetPath = path.resolve(tempPageDir, entry.name);
-          fs.cpSync(sourcePath, targetPath, { recursive: true });
-        }
-      }
-    }
-  }
-
-  // 清理原dist目录并重命名临时目录
-  const distBackup = path.resolve(path.dirname(distDir), '.dist-backup');
-
-  // 清理可能存在的旧备份目录
-  if (fs.existsSync(distBackup)) {
-    fs.rmSync(distBackup, { recursive: true, force: true });
-  }
-
-  // 如果dist目录存在，备份它
-  if (fs.existsSync(distDir)) {
-    fs.renameSync(distDir, distBackup);
-  }
-
-  // 将临时目录重命名为最终目录
-  try {
-    fs.renameSync(tempMergeDir, distDir);
-  } catch (error) {
-    // 如果重命名失败，使用复制方式
-    fs.cpSync(tempMergeDir, distDir, { recursive: true });
-    fs.rmSync(tempMergeDir, { recursive: true, force: true });
-  }
-
-  // 清理备份目录
-  if (fs.existsSync(distBackup)) {
-    fs.rmSync(distBackup, { recursive: true, force: true });
-  }
-
-  // 清理各页面的临时构建目录
-  for (const result of results) {
-    if (result.outputDir && fs.existsSync(result.outputDir)) {
-      fs.rmSync(result.outputDir, { recursive: true, force: true });
-    }
-  }
-}
-
-/**
- * 默认合并模式：所有HTML文件放在根目录
- */
-async function mergeResultsAll(results: BuildResult[], debug: boolean): Promise<void> {
-  const log = debug ? console.log.bind(console, '[merge]') : () => {};
-
-  const distDir = path.resolve(process.cwd(), 'dist');
-  const assetsDir = path.resolve(distDir, 'assets');
-
-  // 确保assets目录存在
-  if (!fs.existsSync(assetsDir)) {
-    fs.mkdirSync(assetsDir, { recursive: true });
-  }
-
-  const htmlFiles: string[] = [];
-
-  // 处理每个策略的构建结果
-  for (const result of results) {
-    if (!result.success) continue;
-
-    const sourceDir = path.resolve(distDir, result.strategy);
-    if (!fs.existsSync(sourceDir)) {
-      log(`警告: 策略目录不存在: ${sourceDir}`);
-      continue;
-    }
-
-    log(`处理策略: ${result.strategy}`);
-
-    // 遍历策略目录中的所有文件
-    const entries = fs.readdirSync(sourceDir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const sourcePath = path.resolve(sourceDir, entry.name);
-
-      if (entry.isFile()) {
-        if (entry.name.endsWith('.html')) {
-          // HTML文件直接复制到dist根目录
-          const targetPath = path.resolve(distDir, entry.name);
-          fs.copyFileSync(sourcePath, targetPath);
-          htmlFiles.push(entry.name);
-          log(`复制HTML: ${entry.name} -> dist/${entry.name}`);
-        } else {
-          // 其他文件复制到对应位置
-          const targetPath = path.resolve(distDir, entry.name);
-          fs.copyFileSync(sourcePath, targetPath);
-          log(`复制文件: ${entry.name} -> dist/${entry.name}`);
-        }
-      } else if (entry.isDirectory() && entry.name === 'assets') {
-        // assets目录需要合并
-        const sourceAssetsDir = sourcePath;
-        const assetEntries = fs.readdirSync(sourceAssetsDir, { withFileTypes: true });
-
-        for (const assetEntry of assetEntries) {
-          const assetSourcePath = path.resolve(sourceAssetsDir, assetEntry.name);
-          const assetTargetPath = path.resolve(assetsDir, assetEntry.name);
-
-          if (assetEntry.isFile()) {
-            // 检查文件是否已存在，如果存在且内容不同，需要重命名
-            if (fs.existsSync(assetTargetPath)) {
-              const sourceContent = fs.readFileSync(assetSourcePath);
-              const targetContent = fs.readFileSync(assetTargetPath);
-
-              if (!sourceContent.equals(targetContent as any)) {
-                // 文件内容不同，添加策略前缀
-                const ext = path.extname(assetEntry.name);
-                const baseName = path.basename(assetEntry.name, ext);
-                const newName = `${baseName}-${result.strategy}${ext}`;
-                const newTargetPath = path.resolve(assetsDir, newName);
-                fs.copyFileSync(assetSourcePath, newTargetPath);
-                log(`复制资源(重命名): ${assetEntry.name} -> assets/${newName}`);
-              } else {
-                log(`跳过重复资源: ${assetEntry.name}`);
-              }
-            } else {
-              fs.copyFileSync(assetSourcePath, assetTargetPath);
-              log(`复制资源: ${assetEntry.name} -> assets/${assetEntry.name}`);
-            }
-          } else if (assetEntry.isDirectory()) {
-            // 递归复制子目录
-            const subTargetDir = path.resolve(assetsDir, assetEntry.name);
-            if (!fs.existsSync(subTargetDir)) {
-              fs.mkdirSync(subTargetDir, { recursive: true });
-            }
-            fs.cpSync(assetSourcePath, subTargetDir, { recursive: true });
-            log(`复制资源目录: ${assetEntry.name} -> assets/${assetEntry.name}`);
-          }
-        }
-      } else if (entry.isDirectory()) {
-        // 其他目录直接复制
-        const targetDir = path.resolve(distDir, entry.name);
-        fs.cpSync(sourcePath, targetDir, { recursive: true });
-        log(`复制目录: ${entry.name} -> dist/${entry.name}`);
-      }
-    }
-  }
-
-  log('✅ 构建结果合并完成');
-  log(`📁 生成页面: ${htmlFiles.join(', ')}`);
-  log(`📦 资源目录: dist/assets/`);
-  log(
-    `🔧 处理策略: ${results
-      .filter(r => r.success)
-      .map(r => r.strategy)
-      .join(', ')}`
-  );
-}
-
-/**
- * 高级合并模式：使用资源重组逻辑
- */
-async function mergeResultsWithReorganization(
-  results: BuildResult[],
-  options: any,
-  debug: boolean
-): Promise<void> {
-  const log = debug ? console.log.bind(console, '[merge]') : () => {};
-
-  // 首先使用默认方式合并到根目录
-  await mergeResultsAll(results, debug);
-
-  // 然后应用重组逻辑
-  const distDir = path.resolve(process.cwd(), 'dist');
-  const mergeMode = options.merge as 'strategy' | 'page';
-
-  log(`应用${mergeMode}模式的资源重组...`);
-
-  try {
-    // 引入重组函数
-    const { reorganizeAssetsInCLI } = await import('./index');
-    await reorganizeAssetsInCLI(distDir, mergeMode, options, log);
-    log(`✅ ${mergeMode}模式资源重组完成`);
-  } catch (error) {
-    log('资源重组失败:', error);
-    throw error;
-  }
-}
-
-/**
  * 清理临时HTML文件
  */
 async function cleanupTempFiles(_debug: boolean): Promise<void> {
@@ -585,14 +219,198 @@ async function cleanupTempFiles(_debug: boolean): Promise<void> {
 }
 
 /**
+ * 扁平化输出结构
+ */
+async function flattenOutput(strategies: string[], debug: boolean): Promise<void> {
+  const log = debug ? console.log.bind(console, '[flatten]') : () => {};
+  const distDir = path.resolve(process.cwd(), 'dist');
+
+  if (!fs.existsSync(distDir)) {
+    return;
+  }
+
+  log('开始扁平化输出结构...');
+
+  // 1. 收集所有HTML文件并移动到根目录
+  const htmlFiles: string[] = [];
+  for (const strategy of strategies) {
+    const strategyDir = path.resolve(distDir, strategy);
+    if (fs.existsSync(strategyDir)) {
+      const files = fs.readdirSync(strategyDir);
+      for (const file of files) {
+        if (file.endsWith('.html')) {
+          const sourcePath = path.resolve(strategyDir, file);
+          const targetPath = path.resolve(distDir, file);
+
+          // 如果目标文件已存在，添加策略前缀
+          const finalTargetPath = fs.existsSync(targetPath)
+            ? path.resolve(distDir, `${strategy}-${file}`)
+            : targetPath;
+
+          fs.renameSync(sourcePath, finalTargetPath);
+          htmlFiles.push(path.basename(finalTargetPath));
+          log(`移动HTML: ${strategy}/${file} -> ${path.basename(finalTargetPath)}`);
+        }
+      }
+    }
+  }
+
+  // 2. 合并所有策略的assets文件到统一目录
+  const assetsDir = path.resolve(distDir, 'assets');
+  if (fs.existsSync(assetsDir)) {
+    // 如果assets目录已存在，先备份
+    const backupDir = path.resolve(distDir, 'assets-backup');
+    if (fs.existsSync(backupDir)) {
+      fs.rmSync(backupDir, { recursive: true });
+    }
+    fs.renameSync(assetsDir, backupDir);
+  }
+
+  // 创建统一的assets目录
+  fs.mkdirSync(assetsDir, { recursive: true });
+  const processedAssets = new Set<string>();
+
+  // 3. 收集并合并所有策略的assets文件
+  for (const strategy of strategies) {
+    const strategyDir = path.resolve(distDir, strategy);
+    if (fs.existsSync(strategyDir)) {
+      const strategyAssetsDir = path.resolve(strategyDir, 'assets');
+      if (fs.existsSync(strategyAssetsDir)) {
+        const files = fs.readdirSync(strategyAssetsDir);
+        for (const file of files) {
+          const sourcePath = path.resolve(strategyAssetsDir, file);
+          const targetPath = path.resolve(assetsDir, file);
+
+          if (!processedAssets.has(file)) {
+            // 文件不存在，直接移动
+            fs.renameSync(sourcePath, targetPath);
+            processedAssets.add(file);
+            log(`移动资源: ${strategy}/assets/${file} -> assets/${file}`);
+          } else {
+            // 文件已存在，比较文件内容决定是否替换
+            const sourceContent = fs.readFileSync(sourcePath);
+            const targetContent = fs.readFileSync(targetPath);
+
+            if (sourceContent.equals(targetContent)) {
+              // 内容相同，删除重复文件
+              fs.unlinkSync(sourcePath);
+              log(`删除重复资源: ${strategy}/assets/${file} (内容相同)`);
+            } else {
+              // 内容不同，添加策略前缀
+              const fileName = path.parse(file).name;
+              const fileExt = path.parse(file).ext;
+              const newFileName = `${fileName}-${strategy}${fileExt}`;
+              const newTargetPath = path.resolve(assetsDir, newFileName);
+              fs.renameSync(sourcePath, newTargetPath);
+              log(`移动资源: ${strategy}/assets/${file} -> assets/${newFileName} (内容不同)`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 4. 处理公共文件（只保留第一个，删除重复的）
+  const processedFiles = new Set<string>();
+  for (const strategy of strategies) {
+    const strategyDir = path.resolve(distDir, strategy);
+    if (fs.existsSync(strategyDir)) {
+      const files = fs.readdirSync(strategyDir);
+      for (const file of files) {
+        if (!file.endsWith('.html') && file !== 'assets') {
+          const sourcePath = path.resolve(strategyDir, file);
+          const targetPath = path.resolve(distDir, file);
+
+          if (fs.statSync(sourcePath).isDirectory()) {
+            // 处理目录
+            if (!processedFiles.has(file)) {
+              if (fs.existsSync(targetPath)) {
+                fs.rmSync(targetPath, { recursive: true });
+              }
+              fs.renameSync(sourcePath, targetPath);
+              processedFiles.add(file);
+              log(`移动目录: ${strategy}/${file} -> ${file}`);
+            } else {
+              // 删除重复目录
+              fs.rmSync(sourcePath, { recursive: true });
+              log(`删除重复目录: ${strategy}/${file}`);
+            }
+          } else {
+            // 处理文件
+            if (!processedFiles.has(file)) {
+              fs.renameSync(sourcePath, targetPath);
+              processedFiles.add(file);
+              log(`移动文件: ${strategy}/${file} -> ${file}`);
+            } else {
+              // 删除重复文件
+              fs.unlinkSync(sourcePath);
+              log(`删除重复文件: ${strategy}/${file}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 5. 更新HTML文件中的资源路径（现在所有资源都在统一的assets目录中）
+  for (const htmlFile of htmlFiles) {
+    const htmlPath = path.resolve(distDir, htmlFile);
+    if (fs.existsSync(htmlPath)) {
+      let content = fs.readFileSync(htmlPath, 'utf-8');
+
+      // 根据HTML文件名确定策略，用于处理重命名后的资源文件
+      let strategy = 'default';
+      if (htmlFile === 'mobile.html') {
+        strategy = 'mobile';
+      } else if (htmlFile === 'tablet.html') {
+        strategy = 'tablet';
+      } else if (htmlFile.startsWith('mobile-')) {
+        strategy = 'mobile';
+      } else if (htmlFile.startsWith('tablet-')) {
+        strategy = 'tablet';
+      }
+
+      // 对于重命名后的资源文件，需要更新为带策略前缀的文件名
+      const strategyAssetsDir = path.resolve(distDir, 'assets');
+      if (fs.existsSync(strategyAssetsDir)) {
+        const assetsFiles = fs.readdirSync(strategyAssetsDir);
+        for (const assetFile of assetsFiles) {
+          if (assetFile.includes(`-${strategy}`)) {
+            const originalName = assetFile.replace(`-${strategy}`, '');
+            // 更安全的正则表达式替换，只匹配完整的文件名
+            const escapedName = originalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`\\./assets/${escapedName}(?=\\s|>|"|')`, 'g');
+            content = content.replace(regex, `./assets/${assetFile}`);
+          }
+        }
+      }
+
+      fs.writeFileSync(htmlPath, content);
+      log(`更新资源路径: ${htmlFile} -> assets/`);
+    }
+  }
+
+  // 6. 清理所有策略目录（扁平化后不再需要）
+  for (const strategy of strategies) {
+    const strategyDir = path.resolve(distDir, strategy);
+    if (fs.existsSync(strategyDir)) {
+      try {
+        fs.rmSync(strategyDir, { recursive: true });
+        log(`删除策略目录: ${strategy}`);
+      } catch (error) {
+        log(`删除策略目录失败: ${strategy}`, error);
+      }
+    }
+  }
+
+  log('扁平化完成');
+}
+
+/**
  * 清理临时文件
  */
-async function cleanup(strategies: string[], options: any, debug: boolean): Promise<void> {
+async function cleanup(strategies: string[], debug: boolean): Promise<void> {
   const log = debug ? console.log.bind(console, '[cleanup]') : () => {};
-
-  log('清理临时文件...');
-
-  const mergeMode = options.merge || 'all';
 
   // 1. 清理项目根目录中的临时HTML文件
   const rootTempFiles = glob.sync('.temp.mp.*.html', { cwd: process.cwd() });
@@ -600,7 +418,6 @@ async function cleanup(strategies: string[], options: any, debug: boolean): Prom
     const tempPath = path.resolve(process.cwd(), tempFile);
     try {
       fs.unlinkSync(tempPath);
-      log(`删除根目录临时文件: ${tempFile}`);
     } catch (error) {
       log(`删除根目录临时文件失败: ${tempFile}`, error);
     }
@@ -615,40 +432,26 @@ async function cleanup(strategies: string[], options: any, debug: boolean): Prom
         const tempPath = path.resolve(strategyDir, tempFile);
         try {
           fs.unlinkSync(tempPath);
-          log(`删除策略目录临时文件: ${strategy}/${tempFile}`);
         } catch (error) {
           log(`删除策略目录临时文件失败: ${strategy}/${tempFile}`, error);
         }
       }
     }
   }
-
-  // 3. 清理策略目录（在 merge='all' 模式下才删除）
-  if (mergeMode === 'all') {
-    const distDir = path.resolve(process.cwd(), 'dist');
-    for (const strategy of strategies) {
-      const strategyDir = path.resolve(distDir, strategy);
-      if (fs.existsSync(strategyDir)) {
-        try {
-          fs.rmSync(strategyDir, { recursive: true, force: true });
-          log(`删除策略目录: ${strategy}`);
-        } catch (error) {
-          log(`删除策略目录失败: ${strategy}`, error);
-        }
-      }
-    }
-  } else {
-    log(`保留策略目录 (merge模式: ${mergeMode})`);
-  }
-
-  log('✅ 清理完成');
 }
 
 /**
  * 主函数
  */
 async function main(): Promise<void> {
-  const { viteBuildArgs, debug, cwd, strategies: specifiedStrategies } = parseArgs();
+  const {
+    viteBuildArgs,
+    debug,
+    cwd,
+    strategies: specifiedStrategies,
+    concurrency,
+    flatten,
+  } = parseArgs();
   const log = debug ? console.log.bind(console, '[main]') : () => {};
 
   // 如果指定了工作目录，切换到该目录
@@ -664,112 +467,25 @@ async function main(): Promise<void> {
 
   try {
     // 1. 加载配置
-    log('📋 加载配置...');
     const options = await loadViteConfig();
-    const mergeMode = options.merge || 'all';
 
     // 2. 清理输出目录
-    log('🧹 清理输出目录...');
     const { cleanViteOutputDirectory } = await import('./build-config');
     cleanViteOutputDirectory(viteBuildArgs);
 
-    if (mergeMode === 'page') {
-      // Page模式：独立构建每个页面
-      await buildPagesMode(options, viteBuildArgs, debug);
-    } else {
-      // All模式：按策略构建
-      await buildStrategiesMode(options, viteBuildArgs, debug, specifiedStrategies);
-    }
+    // 只使用策略模式构建
+    await buildStrategiesMode(
+      options,
+      viteBuildArgs,
+      debug,
+      specifiedStrategies,
+      concurrency,
+      flatten
+    );
   } catch (error) {
     console.error('❌ 构建失败:', error instanceof Error ? error.message : error);
     process.exit(1);
   }
-}
-
-/**
- * Page模式构建
- */
-async function buildPagesMode(
-  options: any,
-  viteBuildArgs: string[],
-  debug: boolean
-): Promise<void> {
-  const log = debug ? console.log.bind(console, '[page-mode]') : () => {};
-
-  log('🚀 开始Page模式构建...');
-
-  // 1. 获取所有页面
-  const { discoverPages } = await import('./build-config');
-  const pages = discoverPages({
-    entry: options.entry || 'src/pages/*/main.{ts,js}',
-    exclude: options.exclude || [],
-    template: options.template || 'index.html',
-    placeholder: options.placeholder || '{{ENTRY_FILE}}',
-    pageConfigs: options.pageConfigs || {},
-    strategies: options.strategies || {},
-  });
-
-  if (pages.length === 0) {
-    throw new Error('未找到任何页面');
-  }
-
-  log(`发现页面: ${pages.map(p => p.name).join(', ')}`);
-
-  // 2. 获取每个页面的策略信息
-  const { getPageConfig } = await import('./page-config');
-  const pageStrategies = new Map<string, string>();
-
-  for (const page of pages) {
-    const pageContext = {
-      pageName: page.name,
-      filePath: page.file,
-      relativePath: path.relative(process.cwd(), page.file),
-    };
-
-    const pageConfig = getPageConfig(options.pageConfigs, pageContext, () => {});
-    const strategy = pageConfig?.strategy || 'default';
-    pageStrategies.set(page.name, strategy);
-  }
-
-  // 3. 并行构建所有页面
-  log('🔨 开始并行构建页面...');
-  const buildPromises = pages.map(page => {
-    const strategy = pageStrategies.get(page.name) || 'default';
-    return buildSinglePage(page.name, viteBuildArgs, debug, strategy, options, page);
-  });
-  const results = await Promise.all(buildPromises);
-
-  // 3. 检查构建结果
-  const successCount = results.filter(r => r.success).length;
-  const failureCount = results.length - successCount;
-
-  console.log(`\n📊 页面构建结果统计:`);
-  console.log(`✅ 成功: ${successCount}`);
-  console.log(`❌ 失败: ${failureCount}`);
-
-  if (failureCount > 0) {
-    console.log(`\n❌ 失败的页面:`);
-    results
-      .filter(r => !r.success)
-      .forEach(result => {
-        console.log(`  - ${result.pageName}: ${result.error}`);
-      });
-
-    await cleanupTempFiles(debug);
-    process.exit(1);
-  }
-
-  // 4. 合并页面构建结果
-  await mergePageResults(results, options, debug);
-
-  // 5. 清理临时文件
-  await cleanupTempFiles(debug);
-
-  // 收集构建结果信息
-  const successfulResults = results.filter(r => r.success);
-  console.log(`\n🎉 所有页面构建成功！`);
-  console.log(`📁 构建结果位于: dist/`);
-  console.log(`📦 构建页面: ${successfulResults.map(r => r.pageName).join(', ')}`);
 }
 
 /**
@@ -779,11 +495,11 @@ async function buildStrategiesMode(
   options: any,
   viteBuildArgs: string[],
   debug: boolean,
-  specifiedStrategies?: string[]
+  specifiedStrategies?: string[],
+  concurrency: number = 3,
+  flatten: boolean = false
 ): Promise<void> {
   const log = debug ? console.log.bind(console, '[strategy-mode]') : () => {};
-
-  log('🚀 开始策略模式构建...');
 
   // 1. 获取所有策略
   const { getAvailableStrategies } = await import('./build-config');
@@ -813,27 +529,31 @@ async function buildStrategiesMode(
       );
     }
     strategies = specifiedStrategies;
-    log(`使用指定的策略: ${strategies.join(', ')}`);
   } else {
     strategies = availableStrategies;
-    log(`构建所有可用策略: ${strategies.join(', ')}`);
   }
 
-  // 3. 并行构建所有策略
-  log('🔨 开始并行构建...');
-  const buildPromises = strategies.map(strategy => buildStrategy(strategy, viteBuildArgs, debug));
-  const results = await Promise.all(buildPromises);
+  log(`🚀 开始构建策略: ${strategies.join(', ')} (并发数: ${concurrency})`);
+
+  // 3. 分批并发构建策略
+  const results: BuildResult[] = [];
+  for (let i = 0; i < strategies.length; i += concurrency) {
+    const batch = strategies.slice(i, i + concurrency);
+    const batchPromises = batch.map(strategy => buildStrategy(strategy, viteBuildArgs, debug));
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+
+    if (debug) {
+      log(`批次 ${Math.floor(i / concurrency) + 1} 完成: ${batch.join(', ')}`);
+    }
+  }
 
   // 4. 检查构建结果
   const successCount = results.filter(r => r.success).length;
   const failureCount = results.length - successCount;
 
-  console.log(`\n📊 构建结果统计:`);
-  console.log(`✅ 成功: ${successCount}`);
-  console.log(`❌ 失败: ${failureCount}`);
-
   if (failureCount > 0) {
-    console.log(`\n❌ 失败的策略:`);
+    console.log(`\n❌ 构建失败:`);
     results
       .filter(r => !r.success)
       .forEach(result => {
@@ -845,23 +565,38 @@ async function buildStrategiesMode(
     process.exit(1);
   }
 
-  // 5. 合并构建结果
-  log('📦 合并构建结果...');
-  await mergeResults(results, options, debug);
+  // 5. 扁平化处理（如果启用）
+  if (flatten) {
+    await flattenOutput(strategies, debug);
+  }
 
-  // 6. 清理临时文件和策略目录
-  await cleanup(strategies, options, debug);
+  // 6. 清理临时文件
+  await cleanup(strategies, debug);
 
   // 收集构建结果信息
   const successfulResults = results.filter(r => r.success);
-  const htmlFiles = fs
-    .readdirSync(path.resolve(process.cwd(), 'dist'))
-    .filter(file => file.endsWith('.html'));
 
-  console.log(`\n🎉 所有策略构建成功！`);
-  console.log(`📁 构建结果位于: dist/`);
-  console.log(`🌐 生成的页面: ${htmlFiles.join(', ')}`);
-  console.log(`📦 构建策略: ${successfulResults.map(r => r.strategy).join(', ')}`);
+  console.log(`\n🎉 构建成功！`);
+  console.log(`📦 策略: ${successfulResults.map(r => r.strategy).join(', ')}`);
+
+  if (flatten) {
+    console.log(`📁 输出结构: 扁平化`);
+    // 显示扁平化后的HTML文件
+    const distDir = path.resolve(process.cwd(), 'dist');
+    if (fs.existsSync(distDir)) {
+      const htmlFiles = fs.readdirSync(distDir).filter(file => file.endsWith('.html'));
+      console.log(`  - HTML文件: ${htmlFiles.join(', ')}`);
+    }
+  } else {
+    // 显示每个策略的输出目录
+    for (const result of successfulResults) {
+      const strategyDir = path.resolve(process.cwd(), 'dist', result.strategy);
+      if (fs.existsSync(strategyDir)) {
+        const htmlFiles = fs.readdirSync(strategyDir).filter(file => file.endsWith('.html'));
+        console.log(`  - ${result.strategy}: ${htmlFiles.join(', ')}`);
+      }
+    }
+  }
 }
 
 // 运行主函数

@@ -1,5 +1,3 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import type { Plugin } from 'vite';
 import { mergeConfig } from 'vite';
 import { setupDevMiddleware } from './dev-server';
@@ -7,7 +5,7 @@ import { generateBuildConfig } from './build-config';
 import { loadUserConfig, hasCustomConfig } from './config-loader';
 import { mergeWithDefaults } from './defaults';
 import type { Options, ConfigTransformFunction } from './types';
-import * as glob from 'glob';
+import * as fs from 'fs';
 
 // 导出类型和工具函数
 export { defineConfig, defineConfigTransform } from './types';
@@ -18,295 +16,6 @@ export type {
   PageContext,
   PageConfig,
 } from './types';
-
-/**
- * 重组构建产物，实现不同的merge模式
- */
-function reorganizeAssets(
-  distDir: string,
-  mode: 'strategy' | 'page',
-  options: Options,
-  log: (...args: any[]) => void
-) {
-  const assetsDir = path.resolve(distDir, 'assets');
-
-  if (!fs.existsSync(assetsDir)) {
-    log('assets目录不存在，跳过重组');
-    return;
-  }
-
-  // 分析所有HTML文件和它们的资源依赖
-  const htmlFiles = fs
-    .readdirSync(distDir)
-    .filter(file => file.endsWith('.html'))
-    .map(file => path.resolve(distDir, file));
-
-  if (htmlFiles.length === 0) {
-    log('未找到HTML文件，但仍需清理assets目录');
-
-    // 即使没有HTML文件，在strategy/page模式下也要清理空的assets目录
-    if ((mode === 'strategy' || mode === 'page') && fs.existsSync(assetsDir)) {
-      try {
-        fs.rmSync(assetsDir, { recursive: true, force: true });
-        log('强制清理整个根目录assets目录 (strategy/page模式)');
-      } catch (error) {
-        log('清理根目录assets失败:', error);
-      }
-    }
-
-    return;
-  }
-
-  const bundleInfo = new Map<string, { assets: string[]; targetDir: string; strategy?: string }>();
-  const allAssetUsage = new Map<string, string[]>(); // 记录每个资源被哪些页面使用
-
-  // 第一阶段：分析每个页面的资源依赖
-  htmlFiles.forEach(htmlFile => {
-    let fileName = path.basename(htmlFile, '.html');
-
-    // 如果是临时文件名，提取真实的页面名
-    if (fileName.startsWith('.temp.mp.')) {
-      fileName = fileName.replace('.temp.mp.', '');
-    }
-
-    const htmlContent = fs.readFileSync(htmlFile, 'utf-8');
-    const assets: string[] = [];
-
-    // 匹配 src 和 href 属性中的 /assets/ 路径
-    const assetRegex = /(?:src|href)="\/assets\/([^"]+)"/g;
-    let match;
-
-    while ((match = assetRegex.exec(htmlContent)) !== null) {
-      const assetFile = match[1];
-      assets.push(assetFile);
-
-      // 记录这个资源被哪些页面使用
-      if (!allAssetUsage.has(assetFile)) {
-        allAssetUsage.set(assetFile, []);
-      }
-      allAssetUsage.get(assetFile)?.push(fileName);
-    }
-
-    // 确定目标目录
-    let targetSubDir = '';
-    if (mode === 'page') {
-      targetSubDir = fileName;
-    }
-
-    const targetDir = path.resolve(distDir, targetSubDir);
-    bundleInfo.set(fileName, { assets, targetDir });
-    log(`页面 ${fileName} 依赖资源:`, assets);
-  });
-
-  // 添加public目录资源处理
-  log('第一阶段补充：分析public目录资源');
-  const publicAssets = new Set<string>();
-  const publicDir = path.resolve(process.cwd(), 'public');
-
-  if (fs.existsSync(publicDir)) {
-    const publicFiles = glob.sync('**/*', { cwd: publicDir, nodir: true });
-    for (const file of publicFiles) {
-      publicAssets.add(file);
-      log(`发现public资源: ${file}`);
-    }
-  }
-
-  // 第二阶段：识别共享资源
-  allAssetUsage.forEach((users, assetFile) => {
-    if (users.length > 1) {
-      log(`共享资源 ${assetFile} 被页面使用:`, users);
-    } else {
-      log(`独占资源 ${assetFile} 仅被页面 ${users[0]} 使用`);
-    }
-  });
-
-  // 第三阶段：复制每个页面需要的所有资源文件（包括共享资源）
-  bundleInfo.forEach(({ assets, targetDir }, pageName) => {
-    // 创建目标目录和assets子目录
-    const pageAssetsDir = path.resolve(targetDir, 'assets');
-    if (!fs.existsSync(pageAssetsDir)) {
-      fs.mkdirSync(pageAssetsDir, { recursive: true });
-    }
-
-    // 复制该页面需要的所有资源文件（包括共享资源）
-    assets.forEach(assetFile => {
-      const sourcePath = path.resolve(assetsDir, assetFile);
-      const targetPath = path.resolve(pageAssetsDir, assetFile);
-
-      if (fs.existsSync(sourcePath)) {
-        fs.copyFileSync(sourcePath, targetPath);
-        const users = allAssetUsage.get(assetFile) || [];
-        const resourceType = users.length > 1 ? '共享资源' : '独占资源';
-        log(
-          `复制${resourceType}到 ${pageName}: assets/${assetFile} -> ${path.relative(distDir, targetPath)}`
-        );
-      } else {
-        log(`警告: 资源文件不存在: ${sourcePath}`);
-      }
-    });
-
-    // 第三阶段补充：复制所有剩余的资源文件
-    if (fs.existsSync(assetsDir)) {
-      const allAssetFiles = fs.readdirSync(assetsDir);
-
-      // 复制所有不在HTML中直接引用的资源文件（如通过JS动态引入的资源）
-      allAssetFiles.forEach(assetFile => {
-        if (!assets.includes(assetFile)) {
-          const sourcePath = path.resolve(assetsDir, assetFile);
-          const targetPath = path.resolve(pageAssetsDir, assetFile);
-
-          if (fs.existsSync(sourcePath)) {
-            fs.copyFileSync(sourcePath, targetPath);
-            log(
-              `复制其他资源文件到 ${pageName}: assets/${assetFile} -> ${path.relative(distDir, targetPath)}`
-            );
-          }
-        }
-      });
-    }
-  });
-
-  log('第三阶段补充：处理public目录资源');
-  // 在每个策略/页面目录中创建public资源的副本
-  const uniqueTargetDirs = new Set<string>();
-  bundleInfo.forEach(({ targetDir }) => {
-    uniqueTargetDirs.add(targetDir);
-  });
-
-  for (const targetDir of uniqueTargetDirs) {
-    for (const publicAsset of publicAssets) {
-      const sourceFile = path.resolve(distDir, publicAsset);
-      const targetFile = path.resolve(targetDir, publicAsset);
-
-      if (fs.existsSync(sourceFile)) {
-        const targetAssetDir = path.dirname(targetFile);
-        if (!fs.existsSync(targetAssetDir)) {
-          fs.mkdirSync(targetAssetDir, { recursive: true });
-        }
-
-        fs.copyFileSync(sourceFile, targetFile);
-        log(`复制public资源: ${publicAsset} -> ${path.relative(distDir, targetFile)}`);
-      }
-    }
-  }
-
-  // 第四阶段：移动HTML文件并更新资源引用
-  bundleInfo.forEach(({ targetDir }, pageName) => {
-    // 查找实际的HTML文件（可能是临时文件名或正常文件名）
-    let originalHtmlPath = path.resolve(distDir, `${pageName}.html`);
-    let actualPageName = pageName;
-
-    // 如果正常文件名不存在，尝试临时文件名
-    if (!fs.existsSync(originalHtmlPath)) {
-      originalHtmlPath = path.resolve(distDir, `.temp.mp.${pageName}.html`);
-      // 从临时文件名中提取页面名
-      if (fs.existsSync(originalHtmlPath)) {
-        actualPageName = pageName; // 保持原页面名
-      }
-    }
-
-    if (fs.existsSync(originalHtmlPath)) {
-      let htmlContent = fs.readFileSync(originalHtmlPath, 'utf-8');
-
-      // 更新资源引用路径：所有资源都使用本地路径
-      htmlContent = htmlContent.replace(/(?:src|href)="\/assets\//g, match => {
-        return match.replace('/assets/', './assets/');
-      });
-
-      // 确定最终的HTML文件路径（使用正常的文件名）
-      let finalHtmlPath: string;
-      if (mode === 'strategy') {
-        finalHtmlPath = path.resolve(targetDir, `${actualPageName}.html`);
-      } else if (mode === 'page') {
-        finalHtmlPath = path.resolve(targetDir, 'index.html');
-      } else {
-        finalHtmlPath = originalHtmlPath;
-      }
-
-      // 写入更新后的HTML文件
-      fs.writeFileSync(finalHtmlPath, htmlContent);
-
-      // 删除原始文件（如果位置发生了变化）
-      if (finalHtmlPath !== originalHtmlPath) {
-        fs.unlinkSync(originalHtmlPath);
-      }
-
-      const relativePath = path.relative(distDir, finalHtmlPath);
-      log(`按${mode}分组移动HTML文件: ${actualPageName}.html -> ${relativePath}`);
-    } else {
-      log(`警告: 未找到HTML文件: ${pageName}.html 或 .temp.mp.${pageName}.html`);
-    }
-  });
-
-  // 第五阶段：清理原始assets目录
-  if (fs.existsSync(assetsDir)) {
-    // 在strategy或page模式下，强制清理整个根目录assets（因为资源已经复制到各个页面目录）
-    if (mode === 'strategy' || mode === 'page') {
-      try {
-        fs.rmSync(assetsDir, { recursive: true, force: true });
-        log('强制清理整个根目录assets目录 (strategy/page模式)');
-      } catch (error) {
-        log('清理根目录assets失败:', error);
-      }
-    } else {
-      // 默认模式：只删除已处理的资源文件
-      allAssetUsage.forEach((users, assetFile) => {
-        const originalPath = path.resolve(assetsDir, assetFile);
-        if (fs.existsSync(originalPath)) {
-          fs.unlinkSync(originalPath);
-          log(`清理原始资源文件: assets/${assetFile}`);
-        }
-      });
-
-      // 如果assets目录为空则删除
-      const finalRemainingFiles = fs.readdirSync(assetsDir);
-      if (finalRemainingFiles.length === 0) {
-        fs.rmdirSync(assetsDir);
-        log('清理空的assets目录');
-      } else {
-        log('assets目录中还有未处理的文件:', finalRemainingFiles);
-      }
-    }
-  }
-
-  // 第五阶段补充：清理根目录的public资源（在strategy/page模式下）
-  if ((mode === 'strategy' || mode === 'page') && publicAssets.size > 0) {
-    log('第五阶段补充：清理根目录的public资源');
-    publicAssets.forEach(publicAsset => {
-      const rootPublicFile = path.resolve(distDir, publicAsset);
-      if (fs.existsSync(rootPublicFile)) {
-        try {
-          fs.unlinkSync(rootPublicFile);
-          log(`删除根目录public资源: ${publicAsset}`);
-        } catch (error) {
-          log(`删除根目录public资源失败: ${publicAsset}`, error);
-        }
-      }
-    });
-
-    // 尝试删除空的public相关目录结构
-    publicAssets.forEach(publicAsset => {
-      const rootPublicFile = path.resolve(distDir, publicAsset);
-      let parentDir = path.dirname(rootPublicFile);
-
-      // 逐级向上检查并删除空目录，直到dist根目录
-      while (parentDir !== distDir && parentDir !== path.dirname(parentDir)) {
-        try {
-          if (fs.existsSync(parentDir) && fs.readdirSync(parentDir).length === 0) {
-            fs.rmdirSync(parentDir);
-            log(`删除空目录: ${path.relative(distDir, parentDir)}`);
-            parentDir = path.dirname(parentDir);
-          } else {
-            break; // 目录不空或不存在，停止向上检查
-          }
-        } catch (error) {
-          // 忽略删除目录失败的错误，可能是权限问题或目录不空
-          break;
-        }
-      }
-    });
-  }
-}
 
 export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
   let resolvedOptions: Options;
@@ -409,39 +118,6 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
 
         log('配置构建模式');
 
-        // 检查是否是单页面构建模式
-        const buildSinglePage = process.env.VITE_MULTI_PAGE_BUILD_SINGLE_PAGE;
-
-        if (buildSinglePage) {
-          // 单页面构建模式：只构建指定的页面
-          log(`单页面构建模式: ${buildSinglePage}`);
-
-          // 生成只包含指定页面的构建配置
-          const buildConfigs = generateBuildConfig({
-            entry: resolvedOptions.entry || 'src/pages/**/*.{ts,js}',
-            exclude: resolvedOptions.exclude || [],
-            template: resolvedOptions.template || 'index.html',
-            placeholder: resolvedOptions.placeholder || '{{ENTRY_FILE}}',
-            merge: resolvedOptions.merge || 'all',
-            strategies: resolvedOptions.strategies || {},
-            pageConfigs: resolvedOptions.pageConfigs || {},
-            forceBuildStrategy: undefined, // 不使用策略过滤
-            forceBuildPage: buildSinglePage, // 使用页面过滤
-          });
-
-          // 应用单页面构建配置
-          const configs = Object.values(buildConfigs);
-          if (configs.length > 0) {
-            const singlePageConfig = configs[0];
-            const mergedConfig = mergeConfig(config, singlePageConfig);
-            Object.assign(config, mergedConfig);
-            log(`已应用单页面构建配置: ${buildSinglePage}`);
-            return;
-          } else {
-            throw new Error(`未找到页面: ${buildSinglePage}`);
-          }
-        }
-
         // 策略构建模式：生成构建配置
         const forceBuildStrategy = process.env.VITE_MULTI_PAGE_STRATEGY;
         const buildConfigs = generateBuildConfig({
@@ -449,7 +125,6 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
           exclude: resolvedOptions.exclude || [],
           template: resolvedOptions.template || 'index.html',
           placeholder: resolvedOptions.placeholder || '{{ENTRY_FILE}}',
-          merge: resolvedOptions.merge || 'all',
           strategies: resolvedOptions.strategies || {},
           pageConfigs: resolvedOptions.pageConfigs || {},
           forceBuildStrategy,
@@ -522,25 +197,9 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
       }
     },
 
-    writeBundle(options: any) {
-      // 只在构建模式下处理merge功能
-      if (!resolvedOptions?.merge || resolvedOptions.merge === 'all') {
-        // 默认模式：所有文件保持在根目录
-        return;
-      }
-
-      const distDir = options.dir || 'dist';
-      const merge = resolvedOptions.merge;
-
-      log(`应用构建产物合并模式: ${merge}`);
-
-      try {
-        // 执行资源重组
-        reorganizeAssets(distDir, merge, resolvedOptions, log);
-      } catch (error) {
-        log('资源重组失败:', error);
-        throw error;
-      }
+    writeBundle() {
+      // 构建完成，无需额外处理
+      // 每个策略已经直接输出到对应的目录
     },
 
     buildEnd() {
@@ -561,18 +220,6 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
       }
     },
   };
-}
-
-/**
- * CLI工具专用的资源重组函数
- */
-export function reorganizeAssetsInCLI(
-  distDir: string,
-  mode: 'strategy' | 'page',
-  options: Options,
-  log: (...args: any[]) => void
-): void {
-  return reorganizeAssets(distDir, mode, options, log);
 }
 
 export default viteMultiPage;

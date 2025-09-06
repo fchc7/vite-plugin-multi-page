@@ -9,12 +9,6 @@ const config = context => {
     exclude: ['src/shared/**/*.ts'],
     debug: !isProduction || isCLI,
 
-    // 构建产物合并模式
-    // 'all' - 所有HTML文件放在根目录 (默认)
-    // 'strategy' - 按策略分组，如: /dist/mobile/page1.html
-    // 'page' - 按页面分组，如: /dist/homePage/index.html
-    merge: 'page',
-
     strategies: {
       default: {
         // 默认策略配置
@@ -138,38 +132,6 @@ const config = context => {
           DEFAULT_PAGE: true,
         },
       };
-    },
-
-    // 页面环境变量注入函数 (仅在 page 模式下生效)
-    pageEnvs: context => {
-      const { pageName, strategy } = context;
-
-      // 为每个页面注入特定的环境变量
-      const envs: Record<string, string> = {
-        VITE_CURRENT_PAGE_NAME: pageName,
-        VITE_CURRENT_STRATEGY: strategy || 'default',
-        VITE_BUILD_TIMESTAMP: new Date().toISOString(),
-      };
-
-      // 根据页面类型添加特定环境变量
-      if (context.relativePath.includes('/mobile/')) {
-        envs.VITE_IS_MOBILE_BUILD = 'true';
-        envs.VITE_MOBILE_API_URL = isProduction
-          ? 'https://mobile-api.example.com'
-          : 'http://localhost:3001/mobile-api';
-      } else if (context.relativePath.includes('/tablet/')) {
-        envs.VITE_IS_TABLET_BUILD = 'true';
-        envs.VITE_TABLET_API_URL = isProduction
-          ? 'https://tablet-api.example.com'
-          : 'http://localhost:3001/tablet-api';
-      } else {
-        envs.VITE_IS_DESKTOP_BUILD = 'true';
-        envs.VITE_DESKTOP_API_URL = isProduction
-          ? 'https://api.example.com'
-          : 'http://localhost:3001/api';
-      }
-
-      return envs;
     },
   };
 };

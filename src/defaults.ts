@@ -11,12 +11,10 @@ export const DEFAULT_CONFIG: Required<
   template: 'index.html',
   placeholder: '{{ENTRY_FILE}}',
   debug: false,
-  merge: 'all',
   strategies: {
     default: {},
   },
   pageConfigs: {},
-  pageEnvs: () => null,
 };
 
 /**
@@ -39,10 +37,8 @@ export function mergeWithDefaults(
     template: userConfig.template ?? DEFAULT_CONFIG.template,
     placeholder: userConfig.placeholder ?? DEFAULT_CONFIG.placeholder,
     debug: userConfig.debug ?? DEFAULT_CONFIG.debug,
-    merge: userConfig.merge ?? DEFAULT_CONFIG.merge,
     strategies,
     pageConfigs: userConfig.pageConfigs ?? DEFAULT_CONFIG.pageConfigs,
-    pageEnvs: userConfig.pageEnvs ?? DEFAULT_CONFIG.pageEnvs,
     __forceBuildStrategy: userConfig.__forceBuildStrategy,
   };
 }
