@@ -1,5 +1,4 @@
 import type { UserConfig } from 'vite';
-import { mergeConfig } from 'vite';
 import { glob } from 'glob';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -12,7 +11,7 @@ import { createLogger } from './utils';
  * 构建时配置生成器
  * 根据策略和页面配置生成多页面构建配置
  */
-export function generateBuildConfig(options: BuildConfigOptions): Record<string, UserConfig> {
+export async function generateBuildConfig(options: BuildConfigOptions): Promise<Record<string, UserConfig>> {
   const {
     entry = 'src/pages/*/main.{ts,js}',
     exclude = [],
@@ -71,7 +70,7 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
 
       log(`强制构建策略: ${forceBuildStrategy}, 页面: ${targetPages.join(', ')}`);
 
-      const config = generateStrategyConfig(
+      const config = await generateStrategyConfig(
         forceBuildStrategy,
         targetPages,
         entryFiles,
@@ -92,7 +91,7 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
 
       // 获取策略配置，如果没有定义则使用空配置（允许默认策略）
       const strategyConfig = strategies[strategyName] || {};
-      const config = generateStrategyConfig(
+      const config = await generateStrategyConfig(
         strategyName,
         pages,
         entryFiles,
@@ -112,7 +111,7 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
 
       // 如果没有任何策略，创建一个默认策略包含所有页面
       const allPageNames = entryFiles.map(f => f.name);
-      const defaultConfig = generateStrategyConfig(
+      const defaultConfig = await generateStrategyConfig(
         'default',
         allPageNames,
         entryFiles,
@@ -138,7 +137,7 @@ export function generateBuildConfig(options: BuildConfigOptions): Record<string,
 /**
  * 为特定策略生成构建配置
  */
-function generateStrategyConfig(
+async function generateStrategyConfig(
   strategyName: string,
   pages: string[],
   entryFiles: Array<{ name: string; file: string }>,
@@ -147,7 +146,7 @@ function generateStrategyConfig(
   defaultTemplate: string,
   placeholder: string,
   log: (...args: any[]) => void
-): UserConfig {
+): Promise<UserConfig> {
   const htmlInputs: Record<string, string> = {};
   const tempFiles: string[] = [];
 
@@ -237,6 +236,7 @@ function generateStrategyConfig(
   let config: UserConfig = baseConfig;
 
   if (strategyConfig) {
+    const { mergeConfig } = await import('vite');
     config = mergeConfig(baseConfig, strategyConfig);
   }
 
