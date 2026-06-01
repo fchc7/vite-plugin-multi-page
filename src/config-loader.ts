@@ -45,7 +45,7 @@ export async function loadUserConfig(context: ConfigContext): Promise<Options | 
 
 async function loadConfigFile(filePath: string): Promise<any> {
   if (filePath.endsWith('.ts')) {
-    const { register } = await import('tsx');
+    const { register } = await import('tsx/esm/api');
     register();
     const fileUrl = pathToFileURL(filePath).href;
     return import(`${fileUrl}?t=${Date.now()}`);

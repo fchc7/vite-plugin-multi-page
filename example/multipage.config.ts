@@ -1,4 +1,6 @@
-const config = context => {
+import { defineConfig } from '@fchc8/vite-plugin-multi-page';
+
+const config = defineConfig(context => {
   const { mode, command, isCLI } = context;
   const isProduction = mode === 'production';
 

@@ -2,7 +2,6 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'node:path';
 
-// 使用 ESM 版本避免类型兼容性问题
 import { viteMultiPage } from '../dist/index.mjs';
 
 // 使用包装后的defineConfig以支持命令行参数
