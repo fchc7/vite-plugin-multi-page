@@ -20,7 +20,7 @@ const config = context => {
         },
         build: {
           sourcemap: !isProduction,
-          minify: isProduction ? 'esbuild' : false,
+          minify: isProduction ? true : false,
         },
         // 默认策略不使用特殊的CSS处理
       },
@@ -37,19 +37,13 @@ const config = context => {
         },
         build: {
           target: ['es2015', 'chrome58', 'safari11'],
-          minify: isProduction ? 'terser' : false,
+          minify: isProduction ? true : false,
           sourcemap: !isProduction,
           ...(isProduction && {
-            terserOptions: {
-              compress: {
-                drop_console: true,
-                drop_debugger: true,
-              },
-            },
-            rollupOptions: {
+            rolldownOptions: {
               output: {
-                manualChunks: {
-                  vendor: ['vue'],
+                codeSplitting: {
+                  moduleSharing: ['vue'],
                 },
               },
             },
@@ -73,9 +67,9 @@ const config = context => {
           target: ['es2018', 'chrome70', 'safari12'],
           chunkSizeWarningLimit: 1000,
           sourcemap: !isProduction,
-          minify: isProduction ? 'esbuild' : false,
+          minify: isProduction ? true : false,
           ...(isProduction && {
-            rollupOptions: {
+            rolldownOptions: {
               output: {
                 chunkFileNames: 'assets/tablet-[name]-[hash].js',
                 entryFileNames: 'assets/tablet-[name]-[hash].js',

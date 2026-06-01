@@ -214,33 +214,32 @@ function generateStrategyConfig(
     htmlInputs[pageName] = tempHtmlPath;
   }
 
-  // 构建基础配置 - 直接输出到策略目录
+  const buildOptions: Record<string, any> = {
+    input: htmlInputs,
+    output: {
+      entryFileNames: 'assets/[name]-[hash].js',
+      chunkFileNames: 'assets/[name]-[hash].js',
+      assetFileNames: 'assets/[name]-[hash][extname]',
+    },
+  };
+
   const baseConfig: UserConfig = {
-    base: './', // 使用相对路径，支持子目录部署
+    base: './',
     build: {
-      outDir: `dist/${strategyName}`, // 直接输出到策略目录
-      rollupOptions: {
-        input: htmlInputs, // 使用临时HTML文件作为输入
-        output: {
-          entryFileNames: 'assets/[name]-[hash].js',
-          chunkFileNames: 'assets/[name]-[hash].js',
-          assetFileNames: 'assets/[name]-[hash][extname]',
-        },
-      },
-      emptyOutDir: false, // 不清空输出目录，避免删除临时HTML文件
+      outDir: `dist/${strategyName}`,
+      rollupOptions: buildOptions,
+      rolldownOptions: buildOptions,
+      emptyOutDir: false,
     },
     define: {},
   };
 
-  // 使用Vite的mergeConfig进行智能深度合并
   let config: UserConfig = baseConfig;
 
   if (strategyConfig) {
     config = mergeConfig(baseConfig, strategyConfig);
   }
 
-  // 合并页面级 define 变量到 Vite 的 define 配置中
-  // 页面级 define 优先级高于策略级 define
   if (Object.keys(allPageDefines).length > 0) {
     config.define = {
       ...config.define,
@@ -248,13 +247,13 @@ function generateStrategyConfig(
     };
   }
 
-  // 手动处理需要特殊控制的配置项，防止被mergeConfig覆盖
   if (!config.build) config.build = {};
   if (!config.build.rollupOptions) config.build.rollupOptions = {};
+  if (!(config.build as any).rolldownOptions) (config.build as any).rolldownOptions = {};
 
-  // 确保关键配置不被覆盖
-  config.build.rollupOptions.input = htmlInputs; // 强制使用临时HTML文件作为输入
-  config.build.emptyOutDir = false; // 不清空输出目录，避免删除临时HTML文件
+  config.build.rollupOptions.input = htmlInputs;
+  (config.build as any).rolldownOptions.input = htmlInputs;
+  config.build.emptyOutDir = false;
 
   // 简化日志输出
   log(`策略 "${strategyName}" - ${pages.length} 个页面`);
