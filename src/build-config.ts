@@ -12,7 +12,9 @@ import { createLogger } from './utils';
  * 构建时配置生成器
  * 根据策略和页面配置生成多页面构建配置
  */
-export async function generateBuildConfig(options: BuildConfigOptions): Promise<Record<string, UserConfig>> {
+export async function generateBuildConfig(
+  options: BuildConfigOptions
+): Promise<Record<string, UserConfig>> {
   const {
     entry = 'src/pages/*/main.{ts,js}',
     exclude = [],

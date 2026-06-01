@@ -1,7 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createJiti } from 'jiti';
 import type { Options } from './types';
 
 export interface ConfigContext {
@@ -46,8 +45,10 @@ export async function loadUserConfig(context: ConfigContext): Promise<Options | 
 
 async function loadConfigFile(filePath: string): Promise<any> {
   if (filePath.endsWith('.ts')) {
-    const jiti = createJiti(import.meta.url, { interopDefault: true });
-    return jiti.import(filePath);
+    const { register } = await import('tsx');
+    register();
+    const fileUrl = pathToFileURL(filePath).href;
+    return import(`${fileUrl}?t=${Date.now()}`);
   }
 
   if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
