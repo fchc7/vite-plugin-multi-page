@@ -27,6 +27,7 @@
   "author": "jx.zhu@foxmail.com",
   "license": "MIT",
   "homepage": "https://github.com/fchc7/vite-plugin-multi-page#readme",
+  "packageManager": "pnpm@10.24.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/fchc7/vite-plugin-multi-page.git"
