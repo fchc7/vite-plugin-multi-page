@@ -40,7 +40,7 @@ export interface BuildConfigOptions {
 }
 
 // 策略配置
-export interface ConfigStrategy extends Omit<UserConfig, 'plugins'> {}
+export type ConfigStrategy = Omit<UserConfig, 'plugins'>;
 
 // 页面配置
 export interface PageConfig {

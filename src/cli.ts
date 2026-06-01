@@ -212,7 +212,7 @@ async function cleanupTempFiles(_debug: boolean): Promise<void> {
     const tempPath = path.resolve(process.cwd(), tempFile);
     try {
       fs.unlinkSync(tempPath);
-    } catch (error) {
+    } catch {
       // 静默处理删除失败
     }
   }
