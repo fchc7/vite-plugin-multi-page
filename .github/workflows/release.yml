@@ -20,9 +20,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v2
         with:
-          version: '10'
+          version: 9
 
       - name: Install dependencies
         run: pnpm install
