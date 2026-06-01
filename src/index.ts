@@ -1,4 +1,5 @@
-import type { Plugin, UserConfig as ViteUserConfig } from 'vite';
+import type { Plugin } from 'vite';
+import { mergeConfig } from 'vite';
 import { setupDevMiddleware } from './dev-server';
 import { generateBuildConfig } from './build-config';
 import { loadUserConfig, hasCustomConfig } from './config-loader';
@@ -137,7 +138,6 @@ export function viteMultiPage(transform?: ConfigTransformFunction): Plugin {
           const strategyConfig = buildConfigs[targetStrategy];
 
           // 使用Vite的mergeConfig进行智能深度合并
-          const { mergeConfig } = await import('vite');
           const mergedConfig = mergeConfig(config, strategyConfig);
 
           // 将合并结果复制回config对象

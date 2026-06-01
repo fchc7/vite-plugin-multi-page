@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as glob from 'glob';
+import { fileURLToPath } from 'node:url';
 import type { Options } from './types';
 import { getViteOutputDirectory } from './build-config';
 
@@ -599,8 +600,8 @@ async function buildStrategiesMode(
   }
 }
 
-// 运行主函数
-if (require.main === module) {
+const __filename = fileURLToPath(import.meta.url);
+if (__filename === path.resolve(process.argv[1])) {
   main().catch(error => {
     console.error('❌ 未处理的错误:', error);
     process.exit(1);

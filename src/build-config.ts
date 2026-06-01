@@ -1,4 +1,5 @@
 import type { UserConfig } from 'vite';
+import { mergeConfig } from 'vite';
 import { glob } from 'glob';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -236,7 +237,6 @@ async function generateStrategyConfig(
   let config: UserConfig = baseConfig;
 
   if (strategyConfig) {
-    const { mergeConfig } = await import('vite');
     config = mergeConfig(baseConfig, strategyConfig);
   }
 

@@ -59,10 +59,11 @@ module.exports.mergeWithDefaults = mergeWithDefaults;`
       }
     },
   },
-  // CLI配置
+  // CLI配置 - ESM 输出，避免 CJS 上下文中加载 Vite 8 ESM 模块失败
   {
     entry: ['src/cli.ts'],
-    format: ['cjs'],
+    format: ['esm'],
+    outDir: 'dist',
     target: 'node20',
     shims: true,
     external: [
@@ -78,7 +79,7 @@ module.exports.mergeWithDefaults = mergeWithDefaults;`
     ],
     noExternal: [],
     minify: true,
-    cjsInterop: true,
+    clean: false,
     esbuildOptions(options) {
       options.legalComments = 'none';
       options.banner = {

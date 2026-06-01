@@ -1,12 +1,12 @@
 {
   "name": "@fchc8/vite-plugin-multi-page",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "A powerful Vite plugin for building multi-page applications with smart file routing and multi-strategy builds",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "bin": {
-    "vite-mp": "dist/cli.js"
+    "vite-mp": "dist/cli.mjs"
   },
   "files": [
     "dist",
